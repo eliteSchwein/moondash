@@ -25,6 +25,7 @@ serde_json = "1"
 nmrs = "2.2"
 tokio = { version = "1", features = ["rt", "rt-multi-thread"] }
 get_if_addrs = "0.5"
+notify = "8"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-cli = "2"

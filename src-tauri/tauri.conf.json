@@ -28,6 +28,10 @@
         {
           "name": "fullscreen",
           "description": "Start in fullscreen"
+        },
+        {
+          "name": "app-config",
+          "takesValue": true
         }
       ]
     }
