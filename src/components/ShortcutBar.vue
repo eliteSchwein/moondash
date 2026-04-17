@@ -2,18 +2,17 @@
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
-import { useI18n } from 'vue-i18n'
 import ShortcutBarButton from './ShortcutBarButton.vue'
 import ShortcutBarAFC from './afc/ShortcutBarAFC.vue'
-import TempDialog from "./dialogs/TempDialog.vue";
-
-const { t } = useI18n()
+import TempDialog from './dialogs/TempDialog.vue'
+import SpeedDialog from './dialogs/SpeedDialog.vue'
 
 const appStore = useAppStore()
 const { moonraker } = storeToRefs(appStore)
 
 const extruderDialogOpen = ref(false)
 const heaterBedDialogOpen = ref(false)
+const speedDialogOpen = ref(false)
 
 const extruderLabel = computed(() => {
   const temp = moonraker.value.extruder.temperature
@@ -29,7 +28,7 @@ const heaterBedLabel = computed(() => {
 
 const printSpeedPercent = computed(() => {
   const speedFactor = moonraker.value.gcodeMove.speedFactor
-  if (typeof speedFactor === 'number') {
+  if (typeof speedFactor === 'number' && Number.isFinite(speedFactor)) {
     return Math.round(speedFactor * 100)
   }
   return null
@@ -123,7 +122,7 @@ const heaterBedMaxTemp = computed(() => 120)
         <ShortcutBarButton
             :icon="printSpeedIcon"
             :label="printSpeedLabel"
-            @click="{}"
+            @click="speedDialogOpen = true"
         />
       </v-list-item>
 
@@ -136,6 +135,7 @@ const heaterBedMaxTemp = computed(() => 120)
 
     <TempDialog
         v-model="extruderDialogOpen"
+        heater="extruder"
         icon="mdi-printer-3d-nozzle-heat"
         title="extruder"
         :current-temp="moonraker.extruder.temperature"
@@ -145,11 +145,17 @@ const heaterBedMaxTemp = computed(() => 120)
 
     <TempDialog
         v-model="heaterBedDialogOpen"
+        heater="heater_bed"
         icon="mdi-radiator"
         title="heater_bed"
         :current-temp="moonraker.heaterBed.temperature"
         :current-target="moonraker.heaterBed.target"
         :max-temp="heaterBedMaxTemp"
+    />
+
+    <SpeedDialog
+        v-model="speedDialogOpen"
+        :current-percent="printSpeedPercent"
     />
   </div>
 </template>

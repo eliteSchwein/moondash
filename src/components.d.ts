@@ -25,6 +25,7 @@ declare module 'vue' {
     ShortcutBarButton: typeof import('./components/ShortcutBarButton.vue')['default']
     ShortcutBarControls: typeof import('./components/ShortcutBarControls.vue')['default']
     ShortcutBarExtruder: typeof import('./components/ShortcutBarExtruder.vue')['default']
+    SpeedDialog: typeof import('./components/dialogs/SpeedDialog.vue')['default']
     TempDialog: typeof import('./components/dialogs/TempDialog.vue')['default']
     TunePanel: typeof import('./components/panels/TunePanel.vue')['default']
   }
