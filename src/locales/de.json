@@ -22,5 +22,12 @@
       "other_lane_colors": "Farben von den anderen Spuren",
       "other_colors": "andere Farben"
     }
+  },
+  "temp": {
+    "current": "Aktuell",
+    "max": "Maximum",
+    "set": "Festlegen",
+    "cancel": "Abbruch",
+    "target": "Ziel"
   }
 }

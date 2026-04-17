@@ -304,6 +304,8 @@ class MoonrakerConnection {
     async registerAllKnownObjects() {
         const result = await this.call<{ objects: string[] }>('printer.objects.list')
 
+        console.log('printer.objects.list', result.objects)
+
         const objects: Record<string, string[] | null> = {
             webhooks: ['state', 'state_message'],
             configfile: ['config', 'settings', 'warnings'],
@@ -316,7 +318,12 @@ class MoonrakerConnection {
             }
         }
 
-        return this.subscribeToPrinterObjects(objects)
+        console.log('printer.objects.subscribe payload', objects)
+
+        const subscribeResult = await this.subscribeToPrinterObjects(objects)
+        console.log('printer.objects.subscribe result', subscribeResult)
+
+        return subscribeResult
     }
 
     async listFiles() {

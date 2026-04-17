@@ -46,15 +46,18 @@ onMounted(async () => {
       ...moonraker.registerDefaultNotifications(),
 
       moonraker.onNotification('notify_status_update', (params) => {
-        appStore.applyMoonrakerStatusUpdate(params?.[0] as Record<string, any>)
+        const payload = Array.isArray(params) ? params[0] : params
+        appStore.applyMoonrakerSubscriptionPayload(payload)
       }),
 
       moonraker.onNotification('notify_proc_stat_update', (params) => {
-        appStore.applyMoonrakerProcStats(params?.[0])
+        const payload = Array.isArray(params) ? params[0] : params
+        appStore.applyMoonrakerProcStats(payload)
       }),
 
       moonraker.onNotification('notify_history_changed', (params) => {
-        appStore.applyMoonrakerHistoryUpdate(params)
+        const payload = Array.isArray(params) ? params[0] : params
+        appStore.applyMoonrakerHistoryUpdate(payload)
       }),
 
       moonraker.onNotification('notify_klippy_ready', () => {
@@ -72,18 +75,20 @@ onMounted(async () => {
 
     await moonraker.startAutoConnectFromConfig()
 
-    try {
-      const initialObjects = await moonraker.registerAllKnownObjects()
-      appStore.applyMoonrakerSubscriptionPayload(initialObjects)
-    } catch (error) {
-      console.warn('initial moonraker subscription payload failed', error)
-    }
+    if (moonraker.getStatus().connected) {
+      try {
+        const initialObjects = await moonraker.registerAllKnownObjects()
+        appStore.applyMoonrakerSubscriptionPayload(initialObjects)
+      } catch (error) {
+        console.warn('initial moonraker subscription payload failed', error)
+      }
 
-    try {
-      const files = await moonraker.listFiles()
-      appStore.setFiles(files)
-    } catch (error) {
-      console.warn('initial moonraker file list failed', error)
+      try {
+        const files = await moonraker.listFiles()
+        appStore.setFiles(files)
+      } catch (error) {
+        console.warn('initial moonraker file list failed', error)
+      }
     }
   } catch (err) {
     console.error('config/moonraker init failed:', err)

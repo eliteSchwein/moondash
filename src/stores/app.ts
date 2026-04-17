@@ -89,6 +89,24 @@ type MoonrakerAfcState = {
   objects: Record<string, unknown>
 }
 
+type MoonrakerDynamicHeater = {
+  key: string
+  label: string
+  temperature: number | null
+  target: number | null
+  power: number | null
+}
+
+type MoonrakerDynamicFan = {
+  key: string
+  label: string
+  speed: number | null
+  rpm: number | null
+  temperature: number | null
+  target: number | null
+  isTemperatureFan: boolean
+}
+
 type FilesState = {
   items: unknown[]
   lastUpdated: number | null
@@ -108,6 +126,24 @@ function asString(value: unknown): string | null {
 
 function asBoolean(value: unknown): boolean | null {
   return typeof value === 'boolean' ? value : null
+}
+
+function prettifyMoonrakerObjectName(key: string): string {
+  const lower = key.toLowerCase()
+
+  if (lower === 'extruder') return 'extruder'
+  if (lower === 'heater_bed') return 'heater_bed'
+  if (lower === 'fan') return 'fan'
+
+  return key
+      .replace(/^heater_generic\s+/i, '')
+      .replace(/^fan_generic\s+/i, '')
+      .replace(/^controller_fan\s+/i, '')
+      .replace(/^heater_fan\s+/i, '')
+      .replace(/^temperature_fan\s+/i, '')
+      .replace(/^temperature_sensor\s+/i, '')
+      .replace(/^_+|_+$/g, '')
+      .replace(/_/g, ' ')
 }
 
 export const useAppStore = defineStore('app', {
@@ -195,6 +231,10 @@ export const useAppStore = defineStore('app', {
         available: false,
         objects: {},
       } as MoonrakerAfcState,
+
+      dynamicHeaters: [] as MoonrakerDynamicHeater[],
+      dynamicFans: [] as MoonrakerDynamicFan[],
+      rawObjects: {} as Record<string, unknown>,
     },
 
     files: {
@@ -236,6 +276,10 @@ export const useAppStore = defineStore('app', {
 
     getAfc: (state) => state.moonraker.afc,
     isAfcAvailable: (state) => state.moonraker.afc.available,
+
+    getDynamicHeaters: (state) => state.moonraker.dynamicHeaters,
+    getDynamicFans: (state) => state.moonraker.dynamicFans,
+    getRawMoonrakerObjects: (state) => state.moonraker.rawObjects,
 
     getFiles: (state) => state.files.items,
     getFilesState: (state) => state.files,
@@ -368,7 +412,84 @@ export const useAppStore = defineStore('app', {
       }
     },
 
+    applyRawMoonrakerObjects(status: Record<string, any>) {
+      for (const [key, value] of Object.entries(status)) {
+        const existing = this.moonraker.rawObjects[key]
+
+        if (
+            existing &&
+            typeof existing === 'object' &&
+            !Array.isArray(existing) &&
+            value &&
+            typeof value === 'object' &&
+            !Array.isArray(value)
+        ) {
+          this.moonraker.rawObjects[key] = {
+            ...(existing as Record<string, unknown>),
+            ...(value as Record<string, unknown>),
+          }
+        } else {
+          this.moonraker.rawObjects[key] = value
+        }
+      }
+    },
+
+    applyDynamicMoonrakerDevices() {
+      const heaterMap = new Map<string, MoonrakerDynamicHeater>()
+      const fanMap = new Map<string, MoonrakerDynamicFan>()
+
+      for (const [key, value] of Object.entries(this.moonraker.rawObjects)) {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+
+        const lower = key.toLowerCase()
+        const record = value as Record<string, unknown>
+
+        if (lower === 'extruder' || lower === 'heater_bed') continue
+        if (lower.startsWith('afc')) continue
+
+        const isTemperatureFan = lower.startsWith('temperature_fan ')
+        const isFan =
+            lower === 'fan' ||
+            lower.startsWith('fan_generic ') ||
+            lower.startsWith('controller_fan ') ||
+            lower.startsWith('heater_fan ') ||
+            isTemperatureFan
+
+        if (isFan) {
+          fanMap.set(key, {
+            key,
+            label: prettifyMoonrakerObjectName(key),
+            speed: asNumber(record.speed),
+            rpm: asNumber(record.rpm),
+            temperature: asNumber(record.temperature),
+            target: asNumber(record.target),
+            isTemperatureFan,
+          })
+          continue
+        }
+
+        const isHeater =
+            lower.startsWith('heater_generic ') ||
+            ('temperature' in record && 'target' in record)
+
+        if (isHeater) {
+          heaterMap.set(key, {
+            key,
+            label: prettifyMoonrakerObjectName(key),
+            temperature: asNumber(record.temperature),
+            target: asNumber(record.target),
+            power: asNumber(record.power),
+          })
+        }
+      }
+
+      this.moonraker.dynamicHeaters = Array.from(heaterMap.values())
+      this.moonraker.dynamicFans = Array.from(fanMap.values())
+    },
+
     applyMoonrakerStatusUpdate(status: Record<string, any>) {
+      this.applyRawMoonrakerObjects(status)
+
       if (status.webhooks) {
         if ('state' in status.webhooks) {
           this.moonraker.webhooks.state = asString(status.webhooks.state)
@@ -391,15 +512,17 @@ export const useAppStore = defineStore('app', {
         }
       }
 
-      if (status.heater_bed) {
-        if ('temperature' in status.heater_bed) {
-          this.moonraker.heaterBed.temperature = asNumber(status.heater_bed.temperature)
+      if (status.heater_bed || status.heaterBed) {
+        const bed = status.heater_bed ?? status.heaterBed
+
+        if ('temperature' in bed) {
+          this.moonraker.heaterBed.temperature = asNumber(bed.temperature)
         }
-        if ('target' in status.heater_bed) {
-          this.moonraker.heaterBed.target = asNumber(status.heater_bed.target)
+        if ('target' in bed) {
+          this.moonraker.heaterBed.target = asNumber(bed.target)
         }
-        if ('power' in status.heater_bed) {
-          this.moonraker.heaterBed.power = asNumber(status.heater_bed.power)
+        if ('power' in bed) {
+          this.moonraker.heaterBed.power = asNumber(bed.power)
         }
       }
 
@@ -407,69 +530,86 @@ export const useAppStore = defineStore('app', {
         this.moonraker.toolhead.position = status.toolhead.position
       }
 
-      if (status.gcode_move) {
-        if ('speed' in status.gcode_move) {
-          this.moonraker.gcodeMove.speed = asNumber(status.gcode_move.speed)
+      if (status.gcode_move || status.gcodeMove) {
+        const gcodeMove = status.gcode_move ?? status.gcodeMove
+
+        if ('speed' in gcodeMove) {
+          this.moonraker.gcodeMove.speed = asNumber(gcodeMove.speed)
         }
-        if ('speed_factor' in status.gcode_move) {
-          this.moonraker.gcodeMove.speedFactor = asNumber(status.gcode_move.speed_factor)
+        if ('speed_factor' in gcodeMove) {
+          this.moonraker.gcodeMove.speedFactor = asNumber(gcodeMove.speed_factor)
+        } else if ('speedFactor' in gcodeMove) {
+          this.moonraker.gcodeMove.speedFactor = asNumber(gcodeMove.speedFactor)
         }
       }
 
-      if (status.print_stats) {
-        if ('state' in status.print_stats) {
-          this.moonraker.printStats.state = asString(status.print_stats.state)
+      if (status.print_stats || status.printStats) {
+        const printStats = status.print_stats ?? status.printStats
+
+        if ('state' in printStats) {
+          this.moonraker.printStats.state = asString(printStats.state)
         }
-        if ('filename' in status.print_stats) {
-          this.moonraker.printStats.filename = asString(status.print_stats.filename)
+        if ('filename' in printStats) {
+          this.moonraker.printStats.filename = asString(printStats.filename)
         }
-        if ('message' in status.print_stats) {
-          this.moonraker.printStats.message = asString(status.print_stats.message)
+        if ('message' in printStats) {
+          this.moonraker.printStats.message = asString(printStats.message)
         }
-        if ('print_duration' in status.print_stats) {
-          this.moonraker.printStats.printDuration = asNumber(status.print_stats.print_duration)
+        if ('print_duration' in printStats) {
+          this.moonraker.printStats.printDuration = asNumber(printStats.print_duration)
+        } else if ('printDuration' in printStats) {
+          this.moonraker.printStats.printDuration = asNumber(printStats.printDuration)
         }
-        if ('total_duration' in status.print_stats) {
-          this.moonraker.printStats.totalDuration = asNumber(status.print_stats.total_duration)
+        if ('total_duration' in printStats) {
+          this.moonraker.printStats.totalDuration = asNumber(printStats.total_duration)
+        } else if ('totalDuration' in printStats) {
+          this.moonraker.printStats.totalDuration = asNumber(printStats.totalDuration)
         }
-        if ('filament_used' in status.print_stats) {
-          this.moonraker.printStats.filamentUsed = asNumber(status.print_stats.filament_used)
+        if ('filament_used' in printStats) {
+          this.moonraker.printStats.filamentUsed = asNumber(printStats.filament_used)
+        } else if ('filamentUsed' in printStats) {
+          this.moonraker.printStats.filamentUsed = asNumber(printStats.filamentUsed)
         }
-        if (
-            'info' in status.print_stats &&
-            status.print_stats.info &&
-            typeof status.print_stats.info === 'object'
-        ) {
-          this.moonraker.printStats.info = status.print_stats.info
+        if ('info' in printStats && printStats.info && typeof printStats.info === 'object') {
+          this.moonraker.printStats.info = printStats.info
         }
       }
 
-      if (status.virtual_sdcard) {
-        if ('progress' in status.virtual_sdcard) {
-          this.moonraker.virtualSdcard.progress = asNumber(status.virtual_sdcard.progress)
+      if (status.virtual_sdcard || status.virtualSdcard) {
+        const virtualSdcard = status.virtual_sdcard ?? status.virtualSdcard
+
+        if ('progress' in virtualSdcard) {
+          this.moonraker.virtualSdcard.progress = asNumber(virtualSdcard.progress)
         }
-        if ('file_position' in status.virtual_sdcard) {
-          this.moonraker.virtualSdcard.filePosition = asNumber(status.virtual_sdcard.file_position)
+        if ('file_position' in virtualSdcard) {
+          this.moonraker.virtualSdcard.filePosition = asNumber(virtualSdcard.file_position)
+        } else if ('filePosition' in virtualSdcard) {
+          this.moonraker.virtualSdcard.filePosition = asNumber(virtualSdcard.filePosition)
         }
-        if ('is_active' in status.virtual_sdcard) {
-          this.moonraker.virtualSdcard.isActive = asBoolean(status.virtual_sdcard.is_active)
+        if ('is_active' in virtualSdcard) {
+          this.moonraker.virtualSdcard.isActive = asBoolean(virtualSdcard.is_active)
+        } else if ('isActive' in virtualSdcard) {
+          this.moonraker.virtualSdcard.isActive = asBoolean(virtualSdcard.isActive)
         }
       }
 
-      if (status.display_status) {
-        if ('message' in status.display_status) {
-          this.moonraker.displayStatus.message = asString(status.display_status.message)
+      if (status.display_status || status.displayStatus) {
+        const displayStatus = status.display_status ?? status.displayStatus
+
+        if ('message' in displayStatus) {
+          this.moonraker.displayStatus.message = asString(displayStatus.message)
         }
-        if ('progress' in status.display_status) {
-          this.moonraker.displayStatus.progress = asNumber(status.display_status.progress)
+        if ('progress' in displayStatus) {
+          this.moonraker.displayStatus.progress = asNumber(displayStatus.progress)
         }
       }
 
       this.applyMoonrakerAfcUpdate(status)
+      this.applyDynamicMoonrakerDevices()
     },
 
     applyMoonrakerSubscriptionPayload(payload: any) {
-      const status = payload?.status ?? payload
+      const status = payload?.status ?? payload?.result?.status ?? payload
       if (status && typeof status === 'object') {
         this.applyMoonrakerStatusUpdate(status)
       }
@@ -615,6 +755,10 @@ export const useAppStore = defineStore('app', {
         available: false,
         objects: {},
       }
+
+      this.moonraker.dynamicHeaters = []
+      this.moonraker.dynamicFans = []
+      this.moonraker.rawObjects = {}
     },
 
     resetFiles() {

@@ -122,7 +122,9 @@ watch(selectedAfcUnit, (value) => {
 
     <v-tabs-window v-model="tab" class="panel-container">
       <v-tabs-window-item value="controls">
-        <v-sheet class="pa-5" color="purple">One</v-sheet>
+        <v-sheet class="" color="transparent">
+          <ShortcutBarControls/>
+        </v-sheet>
       </v-tabs-window-item>
 
       <v-tabs-window-item value="filament">

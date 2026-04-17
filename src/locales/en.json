@@ -22,5 +22,27 @@
       "other_lane_colors": "Colors of other Lanes",
       "other_colors": "other Colors"
     }
+  },
+  "temp": {
+    "dialog": {
+      "current": "Current",
+      "max": "Max",
+      "set": "Set",
+      "cancel": "Cancel",
+      "target": "Target"
+    }
+  },
+  "fan": {
+    "dialog": {
+      "title": "fan",
+      "current": "Current",
+      "target": "Target",
+      "speed": "Speed",
+      "adjust": "Adjust",
+      "temp_placeholder": "0",
+      "speed_placeholder": "0",
+      "cancel": "Cancel",
+      "save": "Save"
+    }
   }
 }

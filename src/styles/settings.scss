@@ -52,3 +52,42 @@ body,
   height: 100%;
   overflow: hidden;
 }
+
+.shortcut-bar-container {
+  height: 100%;
+  width: 4rem;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcut-bar-led-btn {
+  width: 100% !important;
+  border-radius: 5px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+}
+
+.shortcut-bar-list {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.shortcut-bar-bottom-item {
+  margin-top: auto;
+}
+
+.shortcut-bar-list :deep(.v-list-item) {
+  min-height: 0;
+  padding: 0;
+}
+
+.shortcut-bar-list :deep(.v-list-item__content) {
+  padding: 0;
+}

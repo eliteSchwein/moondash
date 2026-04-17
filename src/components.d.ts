@@ -11,6 +11,8 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ExtruderPanel: typeof import('./components/panels/ExtruderPanel.vue')['default']
+    FanDialog: typeof import('./components/dialogs/FanDialog.vue')['default']
     LaneDialogAFC: typeof import('./components/afc/LaneDialogAFC.vue')['default']
     Navigation: typeof import('./components/Navigation.vue')['default']
     PanelAFC: typeof import('./components/afc/PanelAFC.vue')['default']
@@ -20,5 +22,8 @@ declare module 'vue' {
     ShortcutBar: typeof import('./components/ShortcutBar.vue')['default']
     ShortcutBarAFC: typeof import('./components/afc/ShortcutBarAFC.vue')['default']
     ShortcutBarButton: typeof import('./components/ShortcutBarButton.vue')['default']
+    ShortcutBarControls: typeof import('./components/ShortcutBarControls.vue')['default']
+    ShortcutBarExtruder: typeof import('./components/ShortcutBarExtruder.vue')['default']
+    TempDialog: typeof import('./components/dialogs/TempDialog.vue')['default']
   }
 }

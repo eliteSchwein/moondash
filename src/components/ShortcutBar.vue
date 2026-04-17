@@ -1,11 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
+import { useI18n } from 'vue-i18n'
 import ShortcutBarButton from './ShortcutBarButton.vue'
+import ShortcutBarAFC from './afc/ShortcutBarAFC.vue'
+import TempDialog from "./dialogs/TempDialog.vue";
+
+const { t } = useI18n()
 
 const appStore = useAppStore()
 const { moonraker } = storeToRefs(appStore)
+
+const extruderDialogOpen = ref(false)
+const heaterBedDialogOpen = ref(false)
 
 const extruderLabel = computed(() => {
   const temp = moonraker.value.extruder.temperature
@@ -79,6 +87,9 @@ const heaterBedIsHeating = computed(() => {
       Math.abs(target - temp) >= 5
   )
 })
+
+const extruderMaxTemp = computed(() => 300)
+const heaterBedMaxTemp = computed(() => 120)
 </script>
 
 <template>
@@ -91,7 +102,7 @@ const heaterBedIsHeating = computed(() => {
             icon="mdi-printer-3d-nozzle-heat"
             :label="extruderLabel"
             :color="extruderIsHeating ? 'error' : undefined"
-            @click="{}"
+            @click="extruderDialogOpen = true"
         />
       </v-list-item>
 
@@ -102,12 +113,12 @@ const heaterBedIsHeating = computed(() => {
             icon="mdi-radiator"
             :label="heaterBedLabel"
             :color="heaterBedIsHeating ? 'error' : undefined"
-            @click="{}"
+            @click="heaterBedDialogOpen = true"
         />
       </v-list-item>
 
       <v-divider />
-
+      saveTemp
       <v-list-item class="pa-0">
         <ShortcutBarButton
             :icon="printSpeedIcon"
@@ -118,50 +129,30 @@ const heaterBedIsHeating = computed(() => {
 
       <v-divider />
 
-      <v-list-item class="shortcut-bar-bottom-item">
-        <ShortcutBarAFC/>
+      <v-list-item class="shortcut-bar-bottom-item pa-0">
+        <ShortcutBarAFC />
       </v-list-item>
     </v-list>
+
+    <TempDialog
+        v-model="extruderDialogOpen"
+        icon="mdi-printer-3d-nozzle-heat"
+        title="extruder"
+        :current-temp="moonraker.extruder.temperature"
+        :current-target="moonraker.extruder.target"
+        :max-temp="extruderMaxTemp"
+    />
+
+    <TempDialog
+        v-model="heaterBedDialogOpen"
+        icon="mdi-radiator"
+        title="heater_bed"
+        :current-temp="moonraker.heaterBed.temperature"
+        :current-target="moonraker.heaterBed.target"
+        :max-temp="heaterBedMaxTemp"
+    />
   </div>
 </template>
 
 <style scoped>
-.shortcut-bar-container {
-  height: 100%;
-  min-width: 4rem;
-  padding-top: 10px;
-  padding-bottom: 10px;
-  display: flex;
-  flex-direction: column;
-}
-
-.shortcut-bar-led-btn {
-  width: 100% !important;
-  border-radius: 5px;
-  margin-bottom: 5px;
-  flex-shrink: 0;
-}
-
-.shortcut-bar-list {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  background-color: rgba(var(--v-theme-on-surface), 0.12);
-}
-
-.shortcut-bar-bottom-item {
-  margin-top: auto;
-}
-
-.shortcut-bar-list :deep(.v-list-item) {
-  min-height: 0;
-  padding: 0;
-}
-
-.shortcut-bar-list :deep(.v-list-item__content) {
-  padding: 0;
-}
 </style>
