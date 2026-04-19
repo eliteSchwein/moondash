@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { moonraker as moonrakerClient } from '@/plugins/moonraker'
 import { useAppStore } from '@/stores/app'
+import router from '../../router'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -68,6 +69,22 @@ const emit = defineEmits<{
     toolMap: ToolMapEntry[]
   }): void
 }>()
+
+function showErrorToast(message: string) {
+  const store = appStore as unknown as {
+    showToast?: (payload: { message: string; color?: string }) => void
+  }
+
+  if (typeof store.showToast === 'function') {
+    store.showToast({
+      message,
+      color: 'error',
+    })
+    return
+  }
+
+  console.error(message)
+}
 
 const dialogOpen = computed({
   get: () => props.modelValue,
@@ -269,6 +286,7 @@ async function onTimelapseSwitchUpdate() {
 
     await refreshTimelapseStateFromMoonraker()
   } catch {
+    showErrorToast(t('print.dialog.timelapse_update_failed'))
     await refreshTimelapseStateFromMoonraker()
   } finally {
     saving.value = false
@@ -386,14 +404,20 @@ const laneSelectItems = computed(() => {
 })
 
 function laneDisplayName(laneKey: string): string {
+  if (!laneKey) return ''
   const lane = laneOptions.value.find((entry) => entry.key === laneKey)
   if (!lane) return laneKey.replace(/^AFC_stepper\s+/i, '')
   return lane.label
 }
 
 function laneDisplayColor(laneKey: string): string {
+  if (!laneKey) return 'transparent'
   const lane = laneOptions.value.find((entry) => entry.key === laneKey)
   return lane?.color ?? '#434343'
+}
+
+function getLaneMacroName(laneKey: string): string {
+  return laneKey.replace(/^AFC_stepper\s+/i, '').trim()
 }
 
 function getCurrentLaneForTool(tool: string): string {
@@ -535,7 +559,7 @@ watch(
       selectedLaneByTool.value = {}
       for (const tool of requiredTools.value) {
         const presetLane = getCurrentLaneForTool(tool)
-        selectedLaneByTool.value[tool] = presetLane || laneOptions.value[0]?.key || ''
+        selectedLaneByTool.value[tool] = presetLane || ''
       }
     },
     { immediate: true },
@@ -555,16 +579,38 @@ function closeDialog() {
   dialogOpen.value = false
 }
 
-function setLaneForTool(tool: string, lane: string) {
+async function setLaneForTool(tool: string, lane: string) {
   if (saving.value) return
+
   selectedLaneByTool.value = {
     ...selectedLaneByTool.value,
     [tool]: lane,
+  }
+
+  if (!lane) return
+
+  try {
+    saving.value = true
+
+    const laneName = getLaneMacroName(lane)
+    await moonrakerClient.call('printer.gcode.script', {
+      script: `SET_MAP LANE=${laneName} MAP=${tool}`,
+    })
+  } catch {
+    showErrorToast(t('print.dialog.lane_update_failed'))
+  } finally {
+    saving.value = false
   }
 }
 
 async function startPrint() {
   if (!props.file || saving.value) return
+
+  const filePath = getFilePath(props.file)
+  if (!filePath) {
+    showErrorToast(t('print.dialog.print_start_failed'))
+    return
+  }
 
   const toolMap = requiredTools.value
       .map((tool) => ({
@@ -573,13 +619,26 @@ async function startPrint() {
       }))
       .filter((entry): entry is ToolMapEntry => Boolean(entry.lane))
 
-  emit('start', {
-    file: props.file,
-    timelapse: timelapseEnabled.value,
-    toolMap,
-  })
+  try {
+    saving.value = true
 
-  closeDialog()
+    await moonrakerClient.call('printer.print.start', {
+      filename: filePath,
+    })
+
+    emit('start', {
+      file: props.file,
+      timelapse: timelapseEnabled.value,
+      toolMap,
+    })
+
+    dialogOpen.value = false
+    await router.push('/')
+  } catch {
+    showErrorToast(t('print.dialog.print_start_failed'))
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 
@@ -649,6 +708,7 @@ async function startPrint() {
                         item-title="title"
                         item-value="value"
                         hide-details
+                        clearable
                         variant="solo"
                         density="compact"
                         class="tool-strip__select"
@@ -683,8 +743,12 @@ async function startPrint() {
                   <div
                       class="tool-strip__bottom-bar"
                       :style="{
-                      backgroundColor: laneDisplayColor(selectedLaneByTool[tool] || ''),
-                      color: getReadableTextColor(laneDisplayColor(selectedLaneByTool[tool] || '')),
+                      backgroundColor: selectedLaneByTool[tool]
+                        ? laneDisplayColor(selectedLaneByTool[tool] || '')
+                        : 'transparent',
+                      color: selectedLaneByTool[tool]
+                        ? getReadableTextColor(laneDisplayColor(selectedLaneByTool[tool] || ''))
+                        : 'inherit',
                     }"
                   >
                     <span class="tool-strip__bottom-label">
@@ -932,6 +996,7 @@ async function startPrint() {
   padding: 8px 12px;
   font-weight: 700;
   font-size: 0.95rem;
+  min-height: 40px;
 }
 
 .tool-strip__bottom-label {

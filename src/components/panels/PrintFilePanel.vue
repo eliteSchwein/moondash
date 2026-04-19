@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { moonraker as moonrakerClient } from '@/plugins/moonraker'
+import { useAppStore } from '@/stores/app'
 import PrintDialog from '@/components/dialogs/PrintDialog.vue'
 
 const { t } = useI18n()
+const appStore = useAppStore()
+const { moonraker, moonrakerReady } = storeToRefs(appStore)
 
 const FILES_PER_REQUEST = 12
 
@@ -46,6 +50,29 @@ const printDialogOpen = ref(false)
 const selectedFile = ref<MoonrakerFile | null>(null)
 const selectedFileThumbnails = ref<MoonrakerThumbnail[]>([])
 const selectedFileMetadata = ref<MoonrakerGcodeMetadata | null>(null)
+
+const printerIsReadyForSelection = computed(() => {
+  if (!moonrakerReady.value) return false
+
+  const printState = moonraker.value.printStats.state?.toLowerCase() ?? ''
+  const webhookState = moonraker.value.webhooks.state?.toLowerCase() ?? ''
+
+  const busyPrintStates = new Set([
+    'printing',
+    'paused',
+    'pausing',
+    'resuming',
+    'cancelling',
+    'error',
+  ])
+
+  const readyWebhookStates = new Set(['ready'])
+
+  if (!readyWebhookStates.has(webhookState)) return false
+  if (busyPrintStates.has(printState)) return false
+
+  return printState === '' || printState === 'standby' || printState === 'complete'
+})
 
 const moonrakerHttpBase = computed(() => {
   const wsUrl = moonrakerClient.getStatus().url
@@ -139,6 +166,8 @@ function getBestThumbnailUrl(file: MoonrakerFile): string | null {
 }
 
 function openPrintDialog(file: MoonrakerFile) {
+  if (!printerIsReadyForSelection.value) return
+
   const filePath = getFilePath(file)
 
   selectedFile.value = file
@@ -275,6 +304,7 @@ onMounted(async () => {
           v-for="file in pageFiles"
           :key="file.path || file.filename"
           class="print-file-card"
+          :class="{ 'print-file-card--disabled': !printerIsReadyForSelection }"
           variant="flat"
           @click="openPrintDialog(file)"
       >
@@ -379,6 +409,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+}
+
+.print-file-card--disabled {
+  cursor: default;
+  pointer-events: auto;
+  opacity: 0.55;
 }
 
 .print-file-card__title,
