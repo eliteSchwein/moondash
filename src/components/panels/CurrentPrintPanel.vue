@@ -133,7 +133,7 @@ const excludeObjectState = computed(() => {
 
 const canSkipObject = computed(() => {
   const objects = excludeObjectState.value.objects
-  return Array.isArray(objects) && objects.length > 0 && (isPrinting.value || isPaused.value)
+  return Array.isArray(objects) && objects.length > 1 && (isPrinting.value || isPaused.value)
 })
 
 const httpBase = computed(() => {
@@ -323,9 +323,10 @@ watch(
 
           <div class="current-print-panel__actions">
             <v-btn
+                v-if="canSkipObject"
                 class="current-print-panel__action current-print-panel__action--first pr-1"
                 variant="tonal"
-                :disabled="loading || !canSkipObject"
+                :disabled="loading"
                 @click="skipDialogOpen = true"
             >
               <v-icon icon="mdi-debug-step-over" size="18" start />
