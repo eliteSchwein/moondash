@@ -11,7 +11,7 @@ const { isDebugEnabled } = storeToRefs(appStore)
     <v-list class="nav-list" density="compact" nav>
       <v-list-item color="primary" prepend-icon="mdi-home" to="/" />
       <v-list-item color="primary" prepend-icon="mdi-tune-vertical-variant" to="/tune" />
-      <v-list-item color="primary" prepend-icon="mdi-folder" to="/files" />
+      <v-list-item color="primary" prepend-icon="mdi-printer-3d" to="/files" />
       <v-list-item color="primary" prepend-icon="mdi-cog" to="/settings" />
       <v-list-item color="primary" prepend-icon="mdi-star" />
 
