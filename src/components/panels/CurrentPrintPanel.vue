@@ -44,11 +44,20 @@ const progressRatio = computed(() => {
   const displayProgress = moonraker.value.displayStatus.progress
   const fileProgress = moonraker.value.virtualSdcard.progress
 
-  if (typeof displayProgress === 'number' && Number.isFinite(displayProgress)) {
+  // Prefer slicer/M73 progress ONLY if it looks valid
+  if (
+      typeof displayProgress === 'number' &&
+      Number.isFinite(displayProgress) &&
+      displayProgress > 0
+  ) {
     return Math.max(0, Math.min(1, displayProgress))
   }
 
-  if (typeof fileProgress === 'number' && Number.isFinite(fileProgress)) {
+  // Fallback: file position progress
+  if (
+      typeof fileProgress === 'number' &&
+      Number.isFinite(fileProgress)
+  ) {
     return Math.max(0, Math.min(1, fileProgress))
   }
 
