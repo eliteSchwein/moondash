@@ -645,7 +645,8 @@ watch(
 
       await refreshTimelapseStateFromMoonraker()
       await refreshAfcMappingsFromMoonraker()
-      await loadDialogThumbnails(file)
+      if(file !== true)
+        await loadDialogThumbnails(file)
       syncSelectedLanesFromAfc()
     },
     { immediate: true },

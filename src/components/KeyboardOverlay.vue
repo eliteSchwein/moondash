@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useAppStore } from '@/stores/app'
 
 type KeyboardKey = {
   label: string
@@ -26,9 +25,6 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const appStore = useAppStore()
-
-const currentTheme = computed(() => (appStore.isDarkmode ? 'dark' : 'light'))
 const shifted = defineModel<boolean>('shifted', { default: false })
 const previewValue = computed(() => props.modelValue)
 

@@ -1,8 +1,6 @@
-
 .v-list-item__overlay {
   background: transparent !important;
 }
-
 
 .sidenav .v-list-item__prepend {
   font-size: 24px;
@@ -18,15 +16,18 @@
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 /* Track */
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 /* Handle */
 ::-webkit-scrollbar-thumb {
   border-radius: 25px;
   background: rgb(var(--v-theme-surface-bright));
 }
+
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
   background: rgb(var(--v-theme-primary));
@@ -60,7 +61,6 @@ body,
   padding-bottom: 10px;
   display: flex;
   flex-direction: column;
-;
 }
 
 .shortcut-bar-led-btn {
@@ -85,11 +85,11 @@ body,
   margin-top: auto;
 }
 
-.shortcut-bar-list :deep(.v-list-item) {
+.shortcut-bar-list .v-list-item {
   min-height: 0;
   padding: 0;
 }
 
-.shortcut-bar-list :deep(.v-list-item__content) {
+.shortcut-bar-list .v-list-item__content {
   padding: 0;
 }

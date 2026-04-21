@@ -347,6 +347,7 @@ class MoonrakerConnection {
             }, timeoutMs)
 
             this.pending.set(requestId, {
+                // @ts-ignore
                 resolve,
                 reject,
                 timeout,

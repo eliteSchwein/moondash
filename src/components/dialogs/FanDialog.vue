@@ -43,20 +43,6 @@ const resolvedMax = computed(() => {
   return props.fan?.isTemperatureFan ? 120 : 100
 })
 
-const currentDisplayValue = computed(() => {
-  if (!props.fan) return ''
-
-  if (props.fan.isTemperatureFan) {
-    return typeof props.fan.temperature === 'number'
-        ? `${Math.round(props.fan.temperature)}°C`
-        : ''
-  }
-
-  return typeof props.fan.speed === 'number'
-      ? `${Math.round(props.fan.speed * 100)}%`
-      : ''
-})
-
 watch(
     () => props.fan,
     (fan) => {

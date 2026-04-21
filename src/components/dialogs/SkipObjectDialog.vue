@@ -60,18 +60,15 @@ const currentObject = computed(() => {
   return typeof value === 'string' ? value : ''
 })
 
-function normalizePoint(point: PointLike): { x: number; y: number } | null {
-  if (Array.isArray(point) && point.length >= 2) {
-    const x = Number(point[0])
-    const y = Number(point[1])
-    if (Number.isFinite(x) && Number.isFinite(y)) return { x, y }
-    return null
+function normalizePoint(point: PointLike | null | undefined) {
+  if (!point) return null
+
+  if (Array.isArray(point)) {
+    return { x: Number(point[0]), y: Number(point[1]) }
   }
 
-  if (point && typeof point === 'object') {
-    const x = Number(point.x)
-    const y = Number(point.y)
-    if (Number.isFinite(x) && Number.isFinite(y)) return { x, y }
+  if (typeof point === 'object') {
+    return { x: Number(point.x), y: Number(point.y) }
   }
 
   return null

@@ -12,7 +12,6 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AfcAlert: typeof import('./components/notifications/AfcAlert.vue')['default']
-    AlertPanel: typeof import('./components/panels/AlertPanel.vue')['default']
     ColorPickerDialog: typeof import('./components/dialogs/ColorPickerDialog.vue')['default']
     ConfigEditorPanel: typeof import('./components/panels/ConfigEditorPanel.vue')['default']
     ControlPanel: typeof import('./components/panels/ControlPanel.vue')['default']
@@ -27,7 +26,6 @@ declare module 'vue' {
     NetworkPanel: typeof import('./components/panels/NetworkPanel.vue')['default']
     NotificationPanel: typeof import('./components/panels/NotificationPanel.vue')['default']
     PanelAFC: typeof import('./components/afc/PanelAFC.vue')['default']
-    PanelExtruder: typeof import('./components/panels/PanelExtruder.vue')['default']
     PowerDialog: typeof import('./components/dialogs/PowerDialog.vue')['default']
     PrintDialog: typeof import('./components/dialogs/PrintDialog.vue')['default']
     PrintFilePanel: typeof import('./components/panels/PrintFilePanel.vue')['default']
@@ -37,13 +35,11 @@ declare module 'vue' {
     ShortcutBarAFC: typeof import('./components/afc/ShortcutBarAFC.vue')['default']
     ShortcutBarButton: typeof import('./components/ShortcutBarButton.vue')['default']
     ShortcutBarControls: typeof import('./components/ShortcutBarControls.vue')['default']
-    ShortcutBarExtruder: typeof import('./components/ShortcutBarExtruder.vue')['default']
     SkipObjectDialog: typeof import('./components/dialogs/SkipObjectDialog.vue')['default']
     SpeedDialog: typeof import('./components/dialogs/SpeedDialog.vue')['default']
     TempDialog: typeof import('./components/dialogs/TempDialog.vue')['default']
     TunePanel: typeof import('./components/panels/TunePanel.vue')['default']
     WifiNetworkDialog: typeof import('./components/dialogs/WifiNetworkDialog.vue')['default']
-    WifiNetworksDialog: typeof import('./components/dialogs/WifiNetworksDialog.vue')['default']
     WifiSavedDialog: typeof import('./components/dialogs/WifiSavedDialog.vue')['default']
     WifiScanDialog: typeof import('./components/dialogs/WifiScanDialog.vue')['default']
   }

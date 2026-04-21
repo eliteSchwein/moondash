@@ -6,6 +6,13 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import PanelAFC from '@/components/afc/PanelAFC.vue'
 
+type AfcUnit = {
+  id: string
+  key: string
+  label: string
+  displayLabel: string
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -21,7 +28,7 @@ function displayAfterFirstSpace(value: string): string {
   return parts.length > 1 ? parts.slice(1).join(' ') : value
 }
 
-const afcUnits = computed(() => {
+const afcUnits = computed<AfcUnit[]>(() => {
   const objects = moonraker.value.afc.objects as Record<string, any>
   const afcRoot = objects['AFC']
 
@@ -62,12 +69,12 @@ watch(
       const queryUnit =
           typeof route.query.afcUnit === 'string' ? route.query.afcUnit : null
 
-      if (queryUnit && units.some((u) => u.id === queryUnit)) {
+      if (queryUnit && units.some((u: AfcUnit) => u.id === queryUnit)) {
         selectedAfcUnit.value = queryUnit
         return
       }
 
-      if (!selectedAfcUnit.value || !units.some((u) => u.id === selectedAfcUnit.value)) {
+      if (!selectedAfcUnit.value || !units.some((u: AfcUnit) => u.id === selectedAfcUnit.value)) {
         selectedAfcUnit.value = units[0].id
       }
     },

@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from 'vuetify'
 import { useAppStore } from '@/stores/app'
 import ColorPickerDialog from '@/components/dialogs/ColorPickerDialog.vue'
 
 const { t } = useI18n()
-const theme = useTheme()
 const appStore = useAppStore()
 
 const saving = ref(false)

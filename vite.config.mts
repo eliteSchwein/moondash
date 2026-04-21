@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
-import VueRouter from 'unplugin-vue-router/vite'
 import Layouts from 'vite-plugin-vue-layouts-next'
 import Vuetify, { transformAssetUrls } from 'vite-plugin-vuetify'
 import Vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
+import VueRouter from 'vue-router/vite'
 import { fileURLToPath, URL } from 'node:url'
 
 // @ts-expect-error process is a nodejs global
