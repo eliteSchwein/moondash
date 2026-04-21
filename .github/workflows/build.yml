@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  build-amd64:
-    name: Build Linux amd64
+  audit:
+    name: Security audit
     runs-on: ubuntu-latest
 
     steps:
@@ -24,7 +24,45 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "25"
+          cache: "npm"
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Frontend audit
+        run: npm audit --audit-level=high
+
+      - name: Frontend build
+        run: npm run build --if-present
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Rust audit
+        working-directory: src-tauri
+        run: cargo audit
+
+      - name: Rust build check
+        working-directory: src-tauri
+        run: cargo check --all-targets
+
+  build-amd64:
+    name: Build Linux amd64
+    runs-on: ubuntu-latest
+    needs: audit
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "25"
           cache: "npm"
 
       - name: Install frontend dependencies
@@ -66,6 +104,7 @@ jobs:
   build-arm64:
     name: Build Linux arm64
     runs-on: [self-hosted, linux, ARM64]
+    needs: audit
 
     steps:
       - name: Checkout
