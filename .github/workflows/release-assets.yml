@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "25"
           cache: "npm"
 
       - name: Install frontend dependencies
@@ -34,13 +34,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            pkg-config \
+            libglib2.0-dev \
+            libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libgtk-3-dev \
-            libglib2.0-dev \
-            libssl-dev
+            libssl-dev \
+            clang \
+            mold
 
       - name: Build Tauri app (amd64)
         run: npm run tauri build
@@ -106,7 +109,8 @@ jobs:
             librsvg2-dev \
             patchelf \
             libssl-dev \
-            clang
+            clang \
+            mold
 
       - name: Build Tauri app (arm64)
         run: npm run tauri build

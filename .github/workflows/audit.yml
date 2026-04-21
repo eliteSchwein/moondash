@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "25"
           cache: "npm"
 
       - name: Install frontend dependencies
@@ -46,7 +46,8 @@ jobs:
             librsvg2-dev \
             patchelf \
             libssl-dev \
-            clang
+            clang \
+            mold
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
