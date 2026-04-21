@@ -250,12 +250,12 @@ export const useAppStore = defineStore('app', {
   }),
 
   getters: {
-    getPrimaryColor: (state) => state.primaryColor,
-    getSecondaryColor: (state) => state.secondaryColor,
     isDarkmode: (state) => state.darkmode,
     getZoom: (state) => state.zoom,
     isDebugEnabled: (state) => state.debug,
     getLanguage: (state) => state.language,
+    getPrimaryColor: (state) => state.primaryColor,
+    getSecondaryColor: (state) => state.secondaryColor,
 
     getWebsocket: (state) => state.websocket,
     getWebsocketIp: (state) => state.websocket.ip,
@@ -323,6 +323,14 @@ export const useAppStore = defineStore('app', {
 
     applyConfig(config: AppConfig) {
       if (config.styling) {
+        if (typeof config.styling.darkmode === 'boolean') {
+          this.setDarkmode(config.styling.darkmode)
+        }
+
+        if (typeof config.styling.zoom === 'number') {
+          this.setZoom(config.styling.zoom)
+        }
+
         if (typeof config.styling.primary === 'string' && config.styling.primary.trim()) {
           this.primaryColor = config.styling.primary.trim()
         } else {
@@ -333,14 +341,6 @@ export const useAppStore = defineStore('app', {
           this.secondaryColor = config.styling.secondary.trim()
         } else {
           this.secondaryColor = null
-        }
-
-        if (typeof config.styling.darkmode === 'boolean') {
-          this.setDarkmode(config.styling.darkmode)
-        }
-
-        if (typeof config.styling.zoom === 'number') {
-          this.setZoom(config.styling.zoom)
         }
       }
 
@@ -371,6 +371,26 @@ export const useAppStore = defineStore('app', {
       const config = await invoke<AppConfig>('load_config_file', {
         configPath: path,
       })
+      this.applyConfig(config)
+      return config
+    },
+
+    async saveEditableConfig(payload: {
+      styling?: {
+        darkmode?: boolean
+        primary?: string | null
+        secondary?: string | null
+      }
+      system?: {
+        language?: string | null
+      }
+    }) {
+      if (!isTauriRuntime()) return null
+
+      const config = await invoke<AppConfig>('save_editable_config', {
+        editableConfig: payload,
+      })
+
       this.applyConfig(config)
       return config
     },
@@ -791,6 +811,8 @@ export const useAppStore = defineStore('app', {
       this.setZoom(1.0)
       this.setDebug(false)
       this.setLanguage(null)
+      this.primaryColor = null
+      this.secondaryColor = null
       this.setWebsocketIp('127.0.0.1:7125')
       this.resetConnectionState()
       this.resetMoonrakerData()

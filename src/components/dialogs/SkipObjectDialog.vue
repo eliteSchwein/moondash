@@ -258,7 +258,7 @@ async function skipSelectedObject() {
                 {{ t('print.current.close') }}
               </v-btn>
               <v-btn
-                  color="warning"
+                  color="secondary"
                   variant="flat"
                   :disabled="loading || !selectedObject || selectedObject.excluded"
                   @click="skipSelectedObject"
@@ -331,7 +331,7 @@ async function skipSelectedObject() {
 }
 
 .skip-object-preview__polygon--current {
-  stroke: rgba(var(--v-theme-warning), 1);
+  stroke: rgba(var(--v-theme-secondary), 1);
   stroke-width: 2.4;
 }
 
@@ -386,7 +386,7 @@ async function skipSelectedObject() {
 }
 
 .skip-object-item--current {
-  border-left-color: rgba(var(--v-theme-warning), 1);
+  border-left-color: rgba(var(--v-theme-secondary), 1);
 }
 
 .skip-object-item--excluded {

@@ -53,6 +53,179 @@ fn load_config_file(
     Ok(merged)
 }
 
+#[tauri::command]
+fn save_editable_config(
+    editable_config: Value,
+    app: AppHandle,
+    config_state: State<AppConfig>,
+    watched_path_state: State<WatchedConfigPath>,
+) -> Result<Value, String> {
+    let config_path = {
+        let guard = watched_path_state
+            .0
+            .lock()
+            .map_err(|_| "failed to lock watched path state".to_string())?;
+
+        guard
+            .clone()
+            .or_else(get_default_project_config_path)
+            .ok_or_else(|| "no writable config path available".to_string())?
+    };
+
+    let mut current = load_and_merge_config(&config_path).unwrap_or_else(|_| default_config());
+
+    apply_editable_config(&mut current, &editable_config);
+
+    let serialized = serialize_cfg(&current);
+    fs::write(&config_path, serialized)
+        .map_err(|e| format!("failed to write config '{}': {}", config_path, e))?;
+
+    {
+        let mut guard = config_state
+            .0
+            .lock()
+            .map_err(|_| "failed to lock config state".to_string())?;
+        *guard = current.clone();
+    }
+
+    let _ = app.emit("config-loaded", current.clone());
+
+    Ok(current)
+}
+
+fn apply_editable_config(target: &mut Value, patch: &Value) {
+    let Some(target_obj) = target.as_object_mut() else {
+        return;
+    };
+
+    let Some(patch_obj) = patch.as_object() else {
+        return;
+    };
+
+    if let Some(styling_patch) = patch_obj.get("styling").and_then(Value::as_object) {
+        let styling = target_obj
+            .entry("styling".to_string())
+            .or_insert_with(|| Value::Object(Map::new()));
+
+        let Some(styling_obj) = styling.as_object_mut() else {
+            return;
+        };
+
+        if let Some(value) = styling_patch.get("darkmode") {
+            if value.is_boolean() {
+                styling_obj.insert("darkmode".to_string(), value.clone());
+            }
+        }
+
+        if let Some(value) = styling_patch.get("primary") {
+            styling_obj.insert("primary".to_string(), normalize_nullable_string(value));
+        }
+
+        if let Some(value) = styling_patch.get("secondary") {
+            styling_obj.insert("secondary".to_string(), normalize_nullable_string(value));
+        }
+    }
+
+    if let Some(system_patch) = patch_obj.get("system").and_then(Value::as_object) {
+        let system = target_obj
+            .entry("system".to_string())
+            .or_insert_with(|| Value::Object(Map::new()));
+
+        let Some(system_obj) = system.as_object_mut() else {
+            return;
+        };
+
+        if let Some(value) = system_patch.get("language") {
+            system_obj.insert("language".to_string(), normalize_nullable_string(value));
+        }
+    }
+}
+
+fn normalize_nullable_string(value: &Value) -> Value {
+    match value {
+        Value::Null => Value::Null,
+        Value::String(s) => {
+            let trimmed = s.trim();
+            if trimmed.is_empty() {
+                Value::Null
+            } else {
+                Value::String(trimmed.to_string())
+            }
+        }
+        _ => Value::Null,
+    }
+}
+
+fn serialize_cfg(config: &Value) -> String {
+    let Some(root) = config.as_object() else {
+        return String::new();
+    };
+
+    let preferred_order = ["websocket", "styling", "dev", "system"];
+    let mut sections: Vec<String> = preferred_order
+        .iter()
+        .filter(|key| root.contains_key(**key))
+        .map(|key| key.to_string())
+        .collect();
+
+    for key in root.keys() {
+        if !sections.iter().any(|existing| existing == key) {
+            sections.push(key.clone());
+        }
+    }
+
+    let mut out = String::new();
+
+    for (index, section_name) in sections.iter().enumerate() {
+        let Some(section_value) = root.get(section_name) else {
+            continue;
+        };
+
+        if index > 0 {
+            out.push('\n');
+        }
+
+        match section_value {
+            Value::Object(section_obj) => {
+                out.push('[');
+                out.push_str(section_name);
+                out.push_str("]\n");
+
+                let mut keys: Vec<_> = section_obj.keys().cloned().collect();
+                keys.sort();
+
+                for key in keys {
+                    let value = section_obj.get(&key).unwrap_or(&Value::Null);
+                    out.push_str(&key);
+                    out.push_str(": ");
+                    out.push_str(&serialize_scalar(value));
+                    out.push('\n');
+                }
+            }
+            other => {
+                out.push_str(section_name);
+                out.push_str(": ");
+                out.push_str(&serialize_scalar(other));
+                out.push('\n');
+            }
+        }
+    }
+
+    out
+}
+
+fn serialize_scalar(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::Bool(v) => {
+            if *v { "true".to_string() } else { "false".to_string() }
+        }
+        Value::Number(v) => v.to_string(),
+        Value::String(v) => v.clone(),
+        _ => String::new(),
+    }
+}
+
 fn default_config() -> Value {
     json!({
         "websocket": {
@@ -291,6 +464,7 @@ pub fn run() {
             greet,
             get_config,
             load_config_file,
+            save_editable_config,
             network::get_network_status,
             network::get_wifi_settings,
             network::get_wired_settings,

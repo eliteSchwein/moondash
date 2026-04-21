@@ -14,6 +14,7 @@ declare module 'vue' {
     AfcAlert: typeof import('./components/notifications/AfcAlert.vue')['default']
     AlertPanel: typeof import('./components/panels/AlertPanel.vue')['default']
     ColorPickerDialog: typeof import('./components/dialogs/ColorPickerDialog.vue')['default']
+    ConfigEditorPanel: typeof import('./components/panels/ConfigEditorPanel.vue')['default']
     ControlPanel: typeof import('./components/panels/ControlPanel.vue')['default']
     CurrentPrintPanel: typeof import('./components/panels/CurrentPrintPanel.vue')['default']
     ExtruderPanel: typeof import('./components/panels/ExtruderPanel.vue')['default']

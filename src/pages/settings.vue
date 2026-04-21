@@ -20,17 +20,17 @@ const { t } = useI18n()
 
     <v-tabs-window v-model="tab" class="panel-container">
       <v-tabs-window-item value="network">
-        <v-sheet class="pa-0 pr-3 pb-3 pt-" color="red">
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="red">
 
         </v-sheet>
       </v-tabs-window-item>
       <v-tabs-window-item value="settings">
-        <v-sheet class="pa-0 pr-3 pb-3 pt-" color="blue">
-
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="transparent">
+          <ConfigEditorPanel/>
         </v-sheet>
       </v-tabs-window-item>
       <v-tabs-window-item value="tools">
-        <v-sheet class="pa-0 pr-3 pb-3 pt-" color="green">
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="green">
 
         </v-sheet>
       </v-tabs-window-item>

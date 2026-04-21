@@ -127,5 +127,20 @@
     "choose_color": "Choose a Color",
     "additional_colors": "Additional Colors",
     "other_colors": "Other Colors"
+  },
+  "settings": {
+    "tab": {
+      "network": "Network",
+      "settings": "Settings",
+      "tools": "Tools"
+    },
+    "config": {
+      "colors": "Colors",
+      "darkmode": "Darkmode",
+      "primary": "Primary Color",
+      "secondary": "Secondary Color",
+      "language": "Language",
+      "default_colors": "Default Colors"
+    }
   }
 }
