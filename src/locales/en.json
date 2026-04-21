@@ -129,6 +129,34 @@
     "other_colors": "Other Colors"
   },
   "settings": {
+    "network": {
+      "title": "Network",
+      "refresh": "Refresh",
+      "cancel": "Cancel",
+      "close": "Close",
+      "connect": "Connect",
+      "none": "None",
+      "wifi": {
+        "title": "Wi-Fi",
+        "hidden": "Hidden SSID",
+        "connected_ssid": "Connected SSID",
+        "ip": "IP address",
+        "scan": "Scan",
+        "available": "Available networks",
+        "saved_networks": "Saved networks",
+        "connected": "Connected",
+        "saved": "Saved",
+        "no_networks": "No networks found",
+        "no_saved_networks": "No saved networks",
+        "connect_to": "Connect to {ssid}",
+        "ssid": "SSID",
+        "password": "Password"
+      },
+      "wired": {
+        "title": "Wired",
+        "no_interfaces": "No wired interfaces"
+      }
+    },
     "tab": {
       "network": "Network",
       "settings": "Settings",

@@ -20,8 +20,8 @@ const { t } = useI18n()
 
     <v-tabs-window v-model="tab" class="panel-container">
       <v-tabs-window-item value="network">
-        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="red">
-
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="transparent">
+          <NetworkPanel/>
         </v-sheet>
       </v-tabs-window-item>
       <v-tabs-window-item value="settings">

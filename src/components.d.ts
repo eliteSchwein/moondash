@@ -23,6 +23,7 @@ declare module 'vue' {
     LaneDialogAFC: typeof import('./components/afc/LaneDialogAFC.vue')['default']
     MoonrakerAlert: typeof import('./components/notifications/MoonrakerAlert.vue')['default']
     Navigation: typeof import('./components/Navigation.vue')['default']
+    NetworkPanel: typeof import('./components/panels/NetworkPanel.vue')['default']
     NotificationPanel: typeof import('./components/panels/NotificationPanel.vue')['default']
     PanelAFC: typeof import('./components/afc/PanelAFC.vue')['default']
     PanelExtruder: typeof import('./components/panels/PanelExtruder.vue')['default']
@@ -40,5 +41,9 @@ declare module 'vue' {
     SpeedDialog: typeof import('./components/dialogs/SpeedDialog.vue')['default']
     TempDialog: typeof import('./components/dialogs/TempDialog.vue')['default']
     TunePanel: typeof import('./components/panels/TunePanel.vue')['default']
+    WifiNetworkDialog: typeof import('./components/dialogs/WifiNetworkDialog.vue')['default']
+    WifiNetworksDialog: typeof import('./components/dialogs/WifiNetworksDialog.vue')['default']
+    WifiSavedDialog: typeof import('./components/dialogs/WifiSavedDialog.vue')['default']
+    WifiScanDialog: typeof import('./components/dialogs/WifiScanDialog.vue')['default']
   }
 }

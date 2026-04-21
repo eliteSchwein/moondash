@@ -357,6 +357,7 @@ async function skipSelectedObject() {
   overflow-y: auto;
   overflow-x: hidden;
   max-height: calc(100vh - 140px);
+  height: calc(100vh - 140px);
 }
 
 .skip-object-list {

@@ -359,6 +359,8 @@ watch(
               bg-color="rgba(255,255,255,0.25)"
               height="10"
               rounded
+              buffer-color="secondary"
+              buffer-value="100"
           />
 
           <div class="current-print-panel__actions">
