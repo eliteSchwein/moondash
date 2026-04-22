@@ -283,6 +283,7 @@ function handleFanClick(item: (typeof fanItems.value)[number]) {
 <style scoped>
 .shortcut-bar-container {
   width: 7rem;
+  height: calc(100vh - 45px);
 }
 
 .control-card {

@@ -35,6 +35,7 @@ declare module 'vue' {
     ShortcutBarAFC: typeof import('./components/afc/ShortcutBarAFC.vue')['default']
     ShortcutBarButton: typeof import('./components/ShortcutBarButton.vue')['default']
     ShortcutBarControls: typeof import('./components/ShortcutBarControls.vue')['default']
+    ShortcutBarShortcutButton: typeof import('./components/ShortcutBarShortcutButton.vue')['default']
     SkipObjectDialog: typeof import('./components/dialogs/SkipObjectDialog.vue')['default']
     SpeedDialog: typeof import('./components/dialogs/SpeedDialog.vue')['default']
     TempDialog: typeof import('./components/dialogs/TempDialog.vue')['default']

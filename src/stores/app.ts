@@ -17,6 +17,16 @@ type SystemConfig = {
   language?: string | null
 }
 
+export type ShortcutButtonConfig = {
+  name: string
+  macro_inactive: string
+  macro_active?: string
+  icon: string
+  active_config?: string
+  active_type?: string
+  active_threshould?: number
+}
+
 type AppConfig = {
   websocket?: {
     ip?: string
@@ -24,6 +34,7 @@ type AppConfig = {
   styling?: StylingConfig
   dev?: DevConfig
   system?: SystemConfig
+  shortcutbuttons?: ShortcutButtonConfig[]
 }
 
 type MoonrakerHeater = {
@@ -148,6 +159,46 @@ function prettifyMoonrakerObjectName(key: string): string {
       .replace(/_/g, ' ')
 }
 
+function parseShortcutButtonsFromConfig(config: Record<string, unknown>): ShortcutButtonConfig[] {
+  const result: ShortcutButtonConfig[] = []
+
+  for (const [key, value] of Object.entries(config)) {
+    if (!key.toLowerCase().startsWith('shortcutbutton ')) continue
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+
+    const record = value as Record<string, unknown>
+    const name = key.substring('shortcutbutton '.length).trim()
+    if (!name) continue
+
+    const macroInactive = asString(record.macro_inactive)
+    const icon = asString(record.icon)
+
+    if (!macroInactive || !icon) continue
+
+    const button: ShortcutButtonConfig = {
+      name,
+      macro_inactive: macroInactive,
+      icon,
+    }
+
+    const macroActive = asString(record.macro_active)
+    if (macroActive) button.macro_active = macroActive
+
+    const activeConfig = asString(record.active_config)
+    if (activeConfig) button.active_config = activeConfig
+
+    const activeType = asString(record.active_type)
+    if (activeType) button.active_type = activeType
+
+    const threshold = asNumber(record.active_threshould)
+    if (typeof threshold === 'number') button.active_threshould = threshold
+
+    result.push(button)
+  }
+
+  return result.sort((a, b) => a.name.localeCompare(b.name))
+}
+
 export const useAppStore = defineStore('app', {
   state: () => ({
     darkmode: true as boolean,
@@ -156,6 +207,7 @@ export const useAppStore = defineStore('app', {
     language: null as string | null,
     primaryColor: null as string | null,
     secondaryColor: null as string | null,
+    shortcutButtons: [] as ShortcutButtonConfig[],
 
     websocket: {
       ip: '127.0.0.1:7125',
@@ -256,6 +308,7 @@ export const useAppStore = defineStore('app', {
     getLanguage: (state) => state.language,
     getPrimaryColor: (state) => state.primaryColor,
     getSecondaryColor: (state) => state.secondaryColor,
+    getShortcutButtons: (state) => state.shortcutButtons,
 
     getWebsocket: (state) => state.websocket,
     getWebsocketIp: (state) => state.websocket.ip,
@@ -321,6 +374,10 @@ export const useAppStore = defineStore('app', {
       this.moonrakerReady = value
     },
 
+    setShortcutButtons(value: ShortcutButtonConfig[]) {
+      this.shortcutButtons = Array.isArray(value) ? value : []
+    },
+
     applyConfig(config: AppConfig) {
       if (config.styling) {
         if (typeof config.styling.darkmode === 'boolean') {
@@ -356,6 +413,19 @@ export const useAppStore = defineStore('app', {
         this.setLanguage(config.system.language)
       } else if (config.system?.language === null) {
         this.setLanguage(null)
+      }
+
+      if (config.shortcutbuttons && Array.isArray(config.shortcutbuttons)) {
+        this.setShortcutButtons(
+            config.shortcutbuttons.filter(
+                (item): item is ShortcutButtonConfig =>
+                    Boolean(item && typeof item.name === 'string' && item.name.trim() && typeof item.macro_inactive === 'string' && typeof item.icon === 'string'),
+            ),
+        )
+      } else if (typeof config === 'object' && config !== null) {
+        this.setShortcutButtons(parseShortcutButtonsFromConfig(config as Record<string, unknown>))
+      } else {
+        this.setShortcutButtons([])
       }
     },
 
@@ -813,6 +883,7 @@ export const useAppStore = defineStore('app', {
       this.setLanguage(null)
       this.primaryColor = null
       this.secondaryColor = null
+      this.setShortcutButtons([])
       this.setWebsocketIp('127.0.0.1:7125')
       this.resetConnectionState()
       this.resetMoonrakerData()

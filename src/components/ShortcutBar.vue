@@ -3,12 +3,13 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAppStore } from '@/stores/app'
 import ShortcutBarButton from './ShortcutBarButton.vue'
+import ShortcutBarShortcutButton from './ShortcutBarShortcutButton.vue'
 import ShortcutBarAFC from './afc/ShortcutBarAFC.vue'
 import TempDialog from './dialogs/TempDialog.vue'
 import SpeedDialog from './dialogs/SpeedDialog.vue'
 
 const appStore = useAppStore()
-const { moonraker } = storeToRefs(appStore)
+const { moonraker, shortcutButtons } = storeToRefs(appStore)
 
 const extruderDialogOpen = ref(false)
 const heaterBedDialogOpen = ref(false)
@@ -90,11 +91,11 @@ const heaterBedMaxTemp = computed(() => 120)
 
 <template>
   <div class="shortcut-bar-container">
-    <v-btn
-        icon="mdi-lightbulb"
-        class="shortcut-bar-led-btn"
-        variant="tonal"
-    />
+    <div class="shortcut-bar-shortcuts">
+      <template v-for="item in shortcutButtons" :key="item.name">
+        <ShortcutBarShortcutButton :item="item" />
+      </template>
+    </div>
 
     <v-list class="shortcut-bar-list" rounded="rounded">
       <v-list-item class="pa-0">
@@ -164,5 +165,32 @@ const heaterBedMaxTemp = computed(() => 120)
 <style scoped>
 .shortcut-bar-container {
   padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+}
+
+.shortcut-bar-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.shortcut-bar-list {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(var(--v-theme-on-surface), 0.12);
+  max-height: 100%;
+}
+
+.shortcut-bar-bottom-item {
+  margin-top: auto;
 }
 </style>
