@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { moonraker as moonrakerClient } from '@/plugins/moonraker'
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'back'): void
 }>()
 
@@ -17,40 +17,7 @@ const pidHeater = ref('')
 const pidTarget = ref('')
 const pidSaving = ref(false)
 const saveConfigSaving = ref(false)
-
-function asObject(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : null
-}
-
-function normalizeValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(normalizeValue)
-  }
-
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [k, normalizeValue(v)]),
-    )
-  }
-
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-
-    if (/^(true|false)$/i.test(trimmed)) {
-      return trimmed.toLowerCase() === 'true'
-    }
-
-    if (trimmed !== '' && !Number.isNaN(Number(trimmed))) {
-      return Number(trimmed)
-    }
-
-    return trimmed
-  }
-
-  return value
-}
+const hasCompletedPidRun = ref(false)
 
 const heaterOptions = computed(() => {
   const items: Array<{ title: string; value: string }> = []
@@ -72,92 +39,31 @@ const heaterOptions = computed(() => {
 
 const displayValue = computed(() => pidTarget.value || '0')
 
-const hasPendingConfigSaveDebug = computed(() => {
-  const rawObjects = moonraker.value.rawObjects as Record<string, unknown> | undefined
+const currentHeaterTemp = computed(() => {
+  const heater = pidHeater.value
 
-  if (!rawObjects) {
-    return {
-      result: false,
-      reason: 'rawObjects missing',
-      directTruePath: null as string | null,
-      diffSections: [] as string[],
-      diffCount: 0,
-    }
+  if (!heater) return null
+
+  if (heater === 'extruder') {
+    const value = Number(moonraker.value.extruder?.temperature)
+    return Number.isFinite(value) ? value : null
   }
 
-  const configfile = asObject(rawObjects.configfile)
-  const webhooks = asObject(rawObjects.webhooks)
-  const config = asObject(configfile?.config)
-  const settings = asObject(configfile?.settings)
-
-  const directCandidates = [
-    { path: 'configfile.save_config_pending', value: configfile?.save_config_pending },
-    { path: 'configfile.pending_save', value: configfile?.pending_save },
-    { path: 'configfile.needs_save', value: configfile?.needs_save },
-    { path: 'configfile.dirty', value: configfile?.dirty },
-
-    { path: 'webhooks.save_config_pending', value: webhooks?.save_config_pending },
-    { path: 'webhooks.pending_save', value: webhooks?.pending_save },
-    { path: 'webhooks.needs_save', value: webhooks?.needs_save },
-    { path: 'webhooks.dirty', value: webhooks?.dirty },
-
-    { path: 'configfile.settings.save_config_pending', value: settings?.save_config_pending },
-    { path: 'configfile.settings.pending_save', value: settings?.pending_save },
-    { path: 'configfile.settings.needs_save', value: settings?.needs_save },
-    { path: 'configfile.settings.dirty', value: settings?.dirty },
-  ]
-
-  const directMatch = directCandidates.find((candidate) => candidate.value === true)
-
-  const diffSections: string[] = []
-
-  if (config && settings) {
-    for (const [sectionName, rawSettingValue] of Object.entries(settings)) {
-      const rawConfigValue = config[sectionName]
-
-      if (rawConfigValue === undefined) {
-        diffSections.push(sectionName)
-        continue
-      }
-
-      const normalizedSettingValue = normalizeValue(rawSettingValue)
-      const normalizedConfigValue = normalizeValue(rawConfigValue)
-
-      if (JSON.stringify(normalizedSettingValue) !== JSON.stringify(normalizedConfigValue)) {
-        diffSections.push(sectionName)
-      }
-    }
+  if (heater === 'heater_bed') {
+    const value = Number(moonraker.value.heaterBed?.temperature)
+    return Number.isFinite(value) ? value : null
   }
 
-  return {
-    result: Boolean(directMatch) || diffSections.length > 0,
-    reason: directMatch
-        ? `direct flag true at ${directMatch.path}`
-        : diffSections.length > 0
-            ? 'settings/config differences found'
-            : 'no pending-save signal found',
-    directTruePath: directMatch?.path ?? null,
-    diffSections,
-    diffCount: diffSections.length,
-  }
+  const dynamicHeater = (moonraker.value.dynamicHeaters ?? []).find((item) => item.key === heater)
+  const value = Number(dynamicHeater?.temperature)
+
+  return Number.isFinite(value) ? value : null
 })
 
-const hasPendingConfigSave = computed(() => hasPendingConfigSaveDebug.value.result)
-
-watch(
-    hasPendingConfigSaveDebug,
-    (debug, prev) => {
-      const changed =
-          !prev ||
-          debug.result !== prev.result ||
-          debug.reason !== prev.reason ||
-          debug.directTruePath !== prev.directTruePath ||
-          debug.diffCount !== prev.diffCount
-
-      if (!changed) return
-    },
-    { immediate: true, deep: false },
-)
+const displayCurrentTemp = computed(() => {
+  if (currentHeaterTemp.value === null) return '--'
+  return String(Math.round(currentHeaterTemp.value))
+})
 
 function clampTarget(value: number): number {
   return Math.max(0, Math.min(999, Math.round(value)))
@@ -197,6 +103,7 @@ async function runPidTune() {
 
   try {
     pidSaving.value = true
+    hasCompletedPidRun.value = false
 
     await moonrakerClient.call(
         'printer.gcode.script',
@@ -209,6 +116,7 @@ async function runPidTune() {
     console.error('Failed to start PID tuning', error)
   } finally {
     pidSaving.value = false
+    hasCompletedPidRun.value = true
   }
 }
 
@@ -243,7 +151,17 @@ async function saveConfig() {
             </div>
           </div>
 
+          <div class="temp-panel-card temp-panel-card--current">
+            <div class="temp-panel-label">
+              {{ t('settings.tools.pid.current_temp') }}
+            </div>
+            <div class="temp-panel-setpoint-value">
+              {{ displayCurrentTemp }}°C
+            </div>
+          </div>
+
           <v-select
+              :disabled="saveConfigSaving || pidSaving"
               v-model="pidHeater"
               rounded="lg"
               class="no-elevation"
@@ -304,9 +222,10 @@ async function saveConfig() {
         <v-spacer />
 
         <v-btn
+            v-if="hasCompletedPidRun"
             color="secondary"
             :loading="saveConfigSaving"
-            :disabled="saveConfigSaving || pidSaving || !hasPendingConfigSave"
+            :disabled="saveConfigSaving || pidSaving"
             @click="saveConfig"
         >
           {{ t('settings.tools.pid.save_config') }}
@@ -354,7 +273,6 @@ async function saveConfig() {
 .tool-card__actions {
   flex: 0 0 auto;
   margin-top: auto;
-  padding: 12px 16px 16px;
   gap: 8px;
 }
 

@@ -209,6 +209,7 @@
         "run": "Run",
         "heater": "Heater",
         "target_temp": "Target Temp",
+        "current_temp": "Current Temp",
         "save_config": "Save Config"
       },
       "webcam": {
