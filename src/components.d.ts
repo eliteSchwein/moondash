@@ -31,7 +31,6 @@ declare module 'vue' {
     PowerDialog: typeof import('./components/dialogs/PowerDialog.vue')['default']
     PrintDialog: typeof import('./components/dialogs/PrintDialog.vue')['default']
     PrintFilePanel: typeof import('./components/panels/PrintFilePanel.vue')['default']
-    ResonanceToolPanel: typeof import('./components/panels/ResonanceToolPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ShortcutBar: typeof import('./components/ShortcutBar.vue')['default']
