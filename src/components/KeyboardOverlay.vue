@@ -9,19 +9,22 @@ type KeyboardKey = {
   extraWide?: boolean
 }
 
-const props = withDefaults(defineProps<{
-  modelValue: string
-  visible: boolean
-  title?: string
-  layout?: 'default' | 'numeric'
-}>(), {
-  title: '',
-  layout: 'default',
-})
+const props = withDefaults(
+    defineProps<{
+      modelValue: string
+      visible: boolean
+      title?: string
+      layout?: 'default' | 'numeric'
+    }>(),
+    {
+      title: '',
+      layout: 'default',
+    },
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
-  (e: 'enter'): void
+  (e: 'enter', value: string): void
   (e: 'close'): void
 }>()
 
@@ -99,7 +102,7 @@ function pressKey(key: KeyboardKey) {
       emit('update:modelValue', '')
       break
     case 'enter':
-      emit('enter')
+      emit('enter', props.modelValue)
       break
     case 'close':
       emit('close')
@@ -135,11 +138,11 @@ function pressKey(key: KeyboardKey) {
                 type="button"
                 class="keyboard-overlay__key"
                 :class="{
-                'keyboard-overlay__key--wide': key.wide,
-                'keyboard-overlay__key--extra-wide': key.extraWide,
-                'keyboard-overlay__key--active': key.action === 'shift' && shifted,
-                'keyboard-overlay__key--action': !!key.action,
-              }"
+                  'keyboard-overlay__key--wide': key.wide,
+                  'keyboard-overlay__key--extra-wide': key.extraWide,
+                  'keyboard-overlay__key--active': key.action === 'shift' && shifted,
+                  'keyboard-overlay__key--action': !!key.action,
+                }"
                 @click="pressKey(key)"
             >
               {{ key.label }}

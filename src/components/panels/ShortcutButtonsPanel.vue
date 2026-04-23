@@ -12,6 +12,11 @@ type ShortcutButtonEditorItem = ShortcutButtonConfig & {
   position: number
 }
 
+type ShortcutButtonDialogItem = ShortcutButtonConfig & {
+  id: string
+  position?: number
+}
+
 const { t } = useI18n()
 
 const appStore = useAppStore()
@@ -150,13 +155,13 @@ function normalizeButton(item: ShortcutButtonEditorItem): ShortcutButtonConfig |
     position: item.position,
   }
 
-  const macroActive = item.macro_active.trim()
+  const macroActive = item.macro_active?.trim()
   if (macroActive) normalized.macro_active = macroActive
 
-  const activeConfig = item.active_config.trim()
+  const activeConfig = item.active_config?.trim()
   if (activeConfig) normalized.active_config = activeConfig
 
-  const activeType = item.active_type.trim() as ActiveType
+  const activeType = item.active_type?.trim() as ActiveType
   if (activeType) normalized.active_type = activeType
 
   if (typeof item.active_threshould === 'number' && Number.isFinite(item.active_threshould)) {
@@ -187,7 +192,7 @@ async function persistEditorItems() {
   }
 }
 
-async function onEditDialogSave(updated: ShortcutButtonEditorItem) {
+async function onEditDialogSave(updated: ShortcutButtonDialogItem) {
   const normalizedUpdated: ShortcutButtonEditorItem = {
     ...updated,
     name: updated.name?.trim() ?? '',
@@ -232,6 +237,8 @@ async function moveItemUp(index: number) {
   const current = items[index]
   const previous = items[index - 1]
 
+  if (!current || !previous) return
+
   const currentPosition = current.position
   current.position = previous.position
   previous.position = currentPosition
@@ -246,6 +253,8 @@ async function moveItemDown(index: number) {
   const items = [...editorItems.value]
   const current = items[index]
   const next = items[index + 1]
+
+  if (!current || !next) return
 
   const currentPosition = current.position
   current.position = next.position

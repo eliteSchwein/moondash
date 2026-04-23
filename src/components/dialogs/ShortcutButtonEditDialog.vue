@@ -8,6 +8,7 @@ type ActiveType = '' | 'output_pin' | 'fan_generic' | 'fan' | 'temperature_fan'
 
 type ShortcutButtonEditorItem = ShortcutButtonConfig & {
   id: string
+  position?: number
 }
 
 const { t } = useI18n()
@@ -46,6 +47,7 @@ function createFallbackItem(): ShortcutButtonEditorItem {
     active_config: '',
     active_type: '',
     active_threshould: undefined,
+    position: undefined,
   }
 }
 
