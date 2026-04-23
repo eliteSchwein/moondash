@@ -112,38 +112,38 @@ async function saveTemp() {
       </v-card-title>
 
       <v-card-text class="px-6 pb-2">
-        <div class="temp-dialog-layout">
-          <div class="temp-dialog-left">
-            <div class="temp-dialog-setpoint-card">
-              <div class="temp-dialog-reading-label">
+        <div class="temp-panel-layout">
+          <div class="temp-panel-left">
+            <div class="temp-panel-card temp-panel-card--setpoint">
+              <div class="temp-panel-label">
                 {{ t('temp.dialog.target') }}
               </div>
-              <div class="temp-dialog-setpoint-value">
+              <div class="temp-panel-setpoint-value">
                 {{ displayValue }}°C
               </div>
             </div>
 
-            <div class="temp-dialog-reading-card">
-              <div class="temp-dialog-reading-label">
+            <div class="temp-panel-card">
+              <div class="temp-panel-label">
                 {{ t('temp.dialog.current') }}
               </div>
-              <div class="temp-dialog-reading-value">
+              <div class="temp-panel-value">
                 {{ typeof currentTemp === 'number' ? `${Math.round(currentTemp)}°C` : '--°C' }}
               </div>
             </div>
 
-            <div class="temp-dialog-reading-card">
-              <div class="temp-dialog-reading-label">
+            <div class="temp-panel-card">
+              <div class="temp-panel-label">
                 {{ t('temp.dialog.max') }}
               </div>
-              <div class="temp-dialog-reading-value">
+              <div class="temp-panel-value">
                 {{ maxTemp }}°C
               </div>
             </div>
           </div>
 
-          <div class="temp-dialog-right">
-            <div class="temp-dialog-keypad">
+          <div class="temp-panel-right">
+            <div class="temp-panel-keypad">
               <v-btn
                   v-for="key in ['1', '2', '3', '4', '5', '6', '7', '8', '9']"
                   :key="key"
@@ -194,60 +194,5 @@ async function saveTemp() {
 .temp-dialog-title {
   display: flex;
   align-items: center;
-}
-
-.temp-dialog-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.temp-dialog-left {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.temp-dialog-right {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.temp-dialog-reading-card,
-.temp-dialog-setpoint-card {
-  border-radius: 12px;
-  padding: 12px 14px;
-  background: rgba(var(--v-theme-on-surface), 0.06);
-}
-
-.temp-dialog-reading-label {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin-bottom: 4px;
-}
-
-.temp-dialog-reading-value {
-  font-size: 1.1rem;
-  font-weight: 600;
-}
-
-.temp-dialog-setpoint-value {
-  font-size: 1.8rem;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.temp-dialog-keypad {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-
-@media (max-width: 700px) {
-  .temp-dialog-layout {
-    grid-template-columns: 1fr;
-  }
 }
 </style>

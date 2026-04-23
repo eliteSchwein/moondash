@@ -32,7 +32,7 @@ const keyboardVisible = ref(false)
 const keyboardTarget = ref<'' | 'name'>('')
 const keyboardTitle = computed(() => {
   if (keyboardTarget.value === 'name') {
-    return t('settings.shortcuts.dialog.fields.sectionName')
+    return t('settings.shortcuts.dialog.fields.section_name')
   }
   return ''
 })
@@ -249,8 +249,7 @@ function close() {
                 v-model="localItem.macro_inactive"
                 variant="outlined"
                 :items="macroSuggestions"
-                :label="t('settings.shortcuts.dialog.fields.macroInactive')"
-                :placeholder="t('settings.shortcuts.dialog.placeholders.macroInactive')"
+                :label="t('settings.shortcuts.dialog.fields.macro_inactive')"
                 density="compact"
             />
           </v-col>
@@ -260,8 +259,7 @@ function close() {
                 v-model="localItem.macro_active"
                 variant="outlined"
                 :items="macroSuggestions"
-                :label="t('settings.shortcuts.dialog.fields.macroActive')"
-                :placeholder="t('settings.shortcuts.dialog.placeholders.macroActive')"
+                :label="t('settings.shortcuts.dialog.fields.macro_active')"
                 density="compact"
             />
           </v-col>
@@ -271,8 +269,7 @@ function close() {
                 :model-value="getActiveSelection(localItem)"
                 variant="outlined"
                 :items="activeSelectionOptions"
-                :label="t('settings.shortcuts.dialog.fields.activeConfig')"
-                :placeholder="t('settings.shortcuts.dialog.placeholders.activeConfig')"
+                :label="t('settings.shortcuts.dialog.fields.active_config')"
                 density="compact"
                 clearable
                 @update:model-value="onActiveSelectionChanged"

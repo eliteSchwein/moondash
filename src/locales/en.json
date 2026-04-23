@@ -175,11 +175,11 @@
       "dialog": {
         "title": "Edit Shortcut Button",
         "fields": {
-          "sectionName": "Name",
+          "section_name": "Name",
           "icon": "Icon",
-          "macroInactive": "Macro inactive",
-          "macroActive": "Macro active",
-          "activeConfig": "Sensor"
+          "macro_inactive": "Macro inactive",
+          "macro_active": "Macro active",
+          "active_config": "Sensor"
         },
         "threshold": {
           "outputPin": "Threshold is automatic: 0.5",
@@ -192,6 +192,31 @@
         }
       },
       "add": "Add"
+    },
+    "tools":{
+      "bed_mesh": {
+        "title": "Bed Mesh",
+        "no_loaded_mesh": "No Bed Mesh Loaded",
+        "available_meshes": "Mesh Profiles",
+        "no_meshes": "No Bed Mesh Profiles Available",
+        "actions": {
+          "clear_mesh": "Clear Mesh",
+          "calibrate": "Calibrate"
+        }
+      },
+      "pid": {
+        "title": "PID Tune",
+        "run": "Run",
+        "heater": "Heater",
+        "target_temp": "Target Temp",
+        "save_config": "Save Config"
+      },
+      "webcam": {
+        "title": "Webcam",
+        "no_webcam": "No Webcam Found",
+        "refresh": "Refresh",
+        "reload_webcams": "Reload Webcams"
+      }
     }
   }
 }

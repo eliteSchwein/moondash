@@ -46,9 +46,9 @@ type ConnectionHandler = (status: MoonrakerStatus) => void
 type ErrorHandler = (error: unknown) => void
 
 type PendingRequest = {
-    resolve: (value: unknown) => void
+    resolve: (value: any) => void
     reject: (reason?: unknown) => void
-    timeout: ReturnType<typeof setTimeout>
+    timeout: ReturnType<typeof setTimeout> | null
 }
 
 class MoonrakerConnection {
@@ -234,7 +234,7 @@ class MoonrakerConnection {
     async call<T = unknown>(
         method: string,
         params?: Record<string, unknown>,
-        timeoutMs = 10000,
+        timeoutMs: number | null = 10000,
     ): Promise<T> {
         const id = this.requestId++
 
@@ -252,7 +252,7 @@ class MoonrakerConnection {
         id: JsonRpcId,
         method: string,
         params?: Record<string, unknown>,
-        timeoutMs = 10000,
+        timeoutMs: number | null = 10000,
     ): Promise<T> {
         if (this.pending.has(id)) {
             throw new Error(`Moonraker request id already pending: ${id}`)
@@ -324,7 +324,7 @@ class MoonrakerConnection {
 
     private async requestWithId<T = unknown>(
         request: JsonRpcRequest,
-        timeoutMs = 10000,
+        timeoutMs: number | null = 10000,
     ): Promise<T> {
         if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
             throw new Error('Moonraker websocket is not connected')
@@ -341,13 +341,15 @@ class MoonrakerConnection {
         return new Promise<T>((resolve, reject) => {
             const requestId = request.id as JsonRpcId
 
-            const timeout = setTimeout(() => {
-                this.pending.delete(requestId)
-                reject(new Error(`Moonraker request timeout: ${request.method}`))
-            }, timeoutMs)
+            const timeout =
+                typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+                    ? setTimeout(() => {
+                        this.pending.delete(requestId)
+                        reject(new Error(`Moonraker request timeout: ${request.method}`))
+                    }, timeoutMs)
+                    : null
 
             this.pending.set(requestId, {
-                // @ts-ignore
                 resolve,
                 reject,
                 timeout,
@@ -356,7 +358,7 @@ class MoonrakerConnection {
             try {
                 this.ws!.send(JSON.stringify(request))
             } catch (error) {
-                clearTimeout(timeout)
+                if (timeout) clearTimeout(timeout)
                 this.pending.delete(requestId)
                 reject(error)
             }
@@ -408,7 +410,7 @@ class MoonrakerConnection {
             const pending = this.pending.get(message.id)
             if (!pending) return
 
-            clearTimeout(pending.timeout)
+            if (pending.timeout) clearTimeout(pending.timeout)
             this.pending.delete(message.id)
 
             if ('error' in message) {
@@ -476,7 +478,7 @@ class MoonrakerConnection {
 
     private rejectAllPending(error: Error) {
         for (const [id, pending] of this.pending.entries()) {
-            clearTimeout(pending.timeout)
+            if (pending.timeout) clearTimeout(pending.timeout)
             pending.reject(error)
             this.pending.delete(id)
         }

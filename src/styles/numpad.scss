@@ -1,0 +1,54 @@
+.temp-panel-layout,
+.tool-pid-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.temp-panel-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.temp-panel-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.temp-panel-card {
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.temp-panel-card--setpoint .temp-panel-setpoint-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.temp-panel-label {
+  font-size: 0.85rem;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.temp-panel-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.temp-panel-setpoint-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.temp-panel-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}

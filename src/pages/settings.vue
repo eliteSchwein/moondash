@@ -31,8 +31,8 @@ const { t } = useI18n()
         </v-sheet>
       </v-tabs-window-item>
       <v-tabs-window-item value="tools">
-        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="green">
-
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="transparent">
+          <ToolsPanel/>
         </v-sheet>
       </v-tabs-window-item>
       <v-tabs-window-item value="shortcuts">
