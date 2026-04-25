@@ -128,8 +128,8 @@ install_ydotool_binary() {
 questions
 setup_custom_apt_repo_placeholder
 install_packages
-modify_user
 install_ydotool_binary
+modify_user
 install_ydotool_service
 install_service
 
