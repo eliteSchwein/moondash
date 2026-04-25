@@ -7,6 +7,7 @@ import ShortcutBarShortcutButton from './ShortcutBarShortcutButton.vue'
 import ShortcutBarAFC from './afc/ShortcutBarAFC.vue'
 import TempDialog from './dialogs/TempDialog.vue'
 import SpeedDialog from './dialogs/SpeedDialog.vue'
+import {af} from "vuetify/locale";
 
 const appStore = useAppStore()
 const { moonraker, shortcutButtons } = storeToRefs(appStore)
@@ -14,6 +15,9 @@ const { moonraker, shortcutButtons } = storeToRefs(appStore)
 const extruderDialogOpen = ref(false)
 const heaterBedDialogOpen = ref(false)
 const speedDialogOpen = ref(false)
+
+const afcEnabled = computed(() => moonraker.value.afc.available)
+
 
 const orderedShortcutButtons = computed(() => {
   return [...shortcutButtons.value].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
@@ -134,7 +138,7 @@ const heaterBedMaxTemp = computed(() => 120)
 
       <v-divider />
 
-      <v-list-item class="shortcut-bar-bottom-item pa-0">
+      <v-list-item class="shortcut-bar-bottom-item pa-0" v-if="afcEnabled">
         <ShortcutBarAFC />
       </v-list-item>
     </v-list>
