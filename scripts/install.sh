@@ -111,7 +111,7 @@ install_ydotool_binary() {
     return
   fi
 
-  sudo apt-get -y install git cmake g++ scdoc libevdev-dev libuinput-dev
+  sudo apt-get -y install git cmake g++ scdoc libevdev-dev
 
   BUILD_DIR="/tmp/ydotool-build"
   rm -rf "$BUILD_DIR"
