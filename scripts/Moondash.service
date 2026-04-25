@@ -19,7 +19,7 @@ Environment=WLR_RENDERER=gles2
 Environment=GDK_GL=gles
 Environment=WEBKIT_DISABLE_DMABUF_RENDERER=1
 
-ExecStart=/bin/sh -c '(sleep 3; /usr/local/bin/ydotool mousemove -a 2000 2000 || true) & exec /usr/bin/cage -ds -- /usr/bin/moondash --app-config MC_CONFIG_FILE'
+ExecStart=/usr/bin/labwc
 
 Restart=always
 RestartSec=2

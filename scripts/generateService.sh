@@ -24,7 +24,9 @@ for ARGUMENT in "$@"; do
       MCCONFIGFILE="${VALUE}"
       ;;
     --service_suffix)
-      MCSERVICENAME="${MCSERVICENAME}_${VALUE}"
+      if [[ "$VALUE" != "" && "$VALUE" != "moondash" ]]; then
+        MCSERVICENAME="${MCSERVICENAME}_${VALUE}"
+      fi
       ;;
   esac
 done
@@ -34,17 +36,27 @@ if [[ ${UID} == '0' ]]; then
   exit 1
 fi
 
+install_labwc_autostart() {
+  status_msg "Installing labwc autostart"
+
+  mkdir -p "$HOME/.config/labwc"
+
+  cat > "$HOME/.config/labwc/autostart" <<EOF
+#!/bin/sh
+exec /usr/bin/moondash --app-config "$MCCONFIGFILE"
+EOF
+
+  chmod +x "$HOME/.config/labwc/autostart"
+}
+
 install_systemd_service() {
   status_msg "Installing Moondash kiosk unit file"
 
   MCUID="$(id -u "$USER")"
 
   SERVICE=$(<"$SCRIPTPATH/Moondash.service")
-  MCCONFIGFILE_ESC=$(sed "s/\//\\\\\//g" <<< "$MCCONFIGFILE")
-
   SERVICE=$(sed "s/MC_USER/$USER/g" <<< "$SERVICE")
   SERVICE=$(sed "s/MC_UID/$MCUID/g" <<< "$SERVICE")
-  SERVICE=$(sed "s/MC_CONFIG_FILE/$MCCONFIGFILE_ESC/g" <<< "$SERVICE")
 
   echo "$SERVICE" | sudo tee "/etc/systemd/system/$MCSERVICENAME.service" > /dev/null
 
@@ -55,4 +67,5 @@ install_systemd_service() {
   ok_msg "Installed and restarted $MCSERVICENAME.service"
 }
 
+install_labwc_autostart
 install_systemd_service

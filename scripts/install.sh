@@ -63,20 +63,14 @@ install_packages() {
 
   status_msg "Install kiosk dependencies"
   sudo apt-get -y install --no-install-recommends \
-    cage \
-    seatd \
+    labwc \
     dbus-user-session \
     libwebkit2gtk-4.1-0 \
     libgtk-3-0 \
     libayatana-appindicator3-1 \
     libgl1-mesa-dri \
     libegl-mesa0 \
-    libgles2-mesa \
-    git \
-    cmake \
-    g++ \
-    scdoc \
-    libevdev-dev
+    libgles2-mesa
 
   status_msg "Moondash deb install placeholder"
   # TODO: Later, after adding your apt server:
@@ -90,47 +84,13 @@ modify_user() {
 }
 
 install_service() {
-  "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE"
-}
-
-install_ydotool_service() {
-  status_msg "Install ydotoold user service"
-
-  if [[ -x "$SCRIPTPATH/installYdotoolService.sh" ]]; then
-    "$SCRIPTPATH/installYdotoolService.sh"
-  else
-    warn_msg "installYdotoolService.sh not found or not executable; skipping ydotoold setup."
-  fi
-}
-
-install_ydotool_binary() {
-  status_msg "Install ydotool"
-
-  if command -v ydotool >/dev/null 2>&1 && command -v ydotoold >/dev/null 2>&1; then
-    ok_msg "ydotool already installed"
-    return
-  fi
-
-  sudo apt-get -y install git cmake g++ scdoc libevdev-dev
-
-  BUILD_DIR="/tmp/ydotool-build"
-  rm -rf "$BUILD_DIR"
-
-  git clone https://github.com/ReimuNotMoe/ydotool "$BUILD_DIR"
-
-  cmake -S "$BUILD_DIR" -B "$BUILD_DIR/build"
-  cmake --build "$BUILD_DIR/build" -j"$(nproc)"
-  sudo cmake --install "$BUILD_DIR/build"
-
-  ok_msg "ydotool installed"
+  "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE" --service_suffix="${MCSERVICENAME#moondash_}"
 }
 
 questions
 setup_custom_apt_repo_placeholder
 install_packages
-install_ydotool_binary
 modify_user
-install_ydotool_service
 install_service
 
 ok_msg "Installation finished. Reboot is recommended."
