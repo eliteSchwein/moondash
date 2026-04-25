@@ -38,12 +38,11 @@ sudo tee /etc/systemd/system/ydotoold.service > /dev/null <<EOF
 [Unit]
 Description=ydotool daemon
 After=systemd-user-sessions.service
+After=moonraker.service
 
 [Service]
 Type=simple
-User=$USER
-Environment=XDG_RUNTIME_DIR=/run/user/$(id -u "$USER")
-ExecStart=$YDOTOOLD_BIN
+ExecStart=/usr/local/bin/ydotoold
 Restart=always
 RestartSec=1
 

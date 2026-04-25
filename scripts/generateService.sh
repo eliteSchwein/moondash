@@ -9,7 +9,7 @@ default=$(echo -en "\e[39m")
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 
 MCSERVICENAME="moondash"
-MCCONFIGFILE="/home/$(whoami)/moondash.cfg"
+MCCONFIGFILE="/home/$(whoami)/printer_data/config/moondash.cfg"
 
 status_msg(){ echo; echo -e "${yellow}###### $1${default}"; }
 ok_msg(){ echo -e "${green}>>>>>> $1${default}"; }
