@@ -16,15 +16,36 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
+    container: debian:12
 
     steps:
+      - name: Install base tools
+        run: |
+          apt-get update
+          apt-get install -y \
+            ca-certificates \
+            curl \
+            git \
+            xz-utils \
+            build-essential \
+            pkg-config \
+            libglib2.0-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            clang \
+            mold
+
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "25"
+          node-version: "22"
           cache: "npm"
 
       - name: Install frontend dependencies
@@ -39,21 +60,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            pkg-config \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            clang \
-            mold
-
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
@@ -65,31 +71,39 @@ jobs:
         working-directory: src-tauri
         run: cargo check --all-targets
 
-  build-amd64:
-    name: Build Linux amd64
-    runs-on: ubuntu-latest
+  build-linux:
+    name: Build Linux ${{ matrix.arch }} Debian ${{ matrix.debian }}
     needs: audit
+    runs-on: ${{ matrix.runner }}
+    container: debian:${{ matrix.debian }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            debian: "12"
+          - arch: amd64
+            runner: ubuntu-latest
+            debian: "13"
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            debian: "12"
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            debian: "13"
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "25"
-          cache: "npm"
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install Linux build dependencies
+      - name: Install base tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
+            ca-certificates \
+            curl \
+            git \
+            xz-utils \
+            build-essential \
             pkg-config \
             libglib2.0-dev \
             libgtk-3-dev \
@@ -99,39 +113,16 @@ jobs:
             patchelf \
             libssl-dev \
             clang \
-            mold
+            mold \
+            binutils
 
-      - name: Build Tauri app (amd64)
-        run: npm run tauri build
-
-      - name: Collect amd64 artifacts
-        run: |
-          mkdir -p dist-artifacts/amd64
-          find src-tauri/target/release/bundle -type f \( -name "*.deb" -o -perm -111 \) -exec cp -v {} dist-artifacts/amd64/ \; || true
-          if [ -f "src-tauri/target/release/mooncord" ]; then
-            cp -v src-tauri/target/release/mooncord dist-artifacts/amd64/
-          fi
-
-      - name: Upload amd64 artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-amd64-artifacts
-          path: dist-artifacts/amd64
-          if-no-files-found: error
-
-  build-arm64:
-    name: Build Linux arm64
-    runs-on: ubuntu-24.04-arm
-    needs: audit
-
-    steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "25"
+          node-version: "22"
           cache: "npm"
 
       - name: Install frontend dependencies
@@ -140,35 +131,33 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            pkg-config \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libssl-dev \
-            clang \
-            mold
-
-      - name: Build Tauri app (arm64)
+      - name: Build Tauri app
         run: npm run tauri build
 
-      - name: Collect arm64 artifacts
+      - name: Verify GLIBC requirement
         run: |
-          mkdir -p dist-artifacts/arm64
-          find src-tauri/target/release/bundle -type f \( -name "*.deb" -o -perm -111 \) -exec cp -v {} dist-artifacts/arm64/ \; || true
+          ldd --version
           if [ -f "src-tauri/target/release/mooncord" ]; then
-            cp -v src-tauri/target/release/mooncord dist-artifacts/arm64/
+            objdump -T src-tauri/target/release/mooncord | grep GLIBC_ | sort -Vu | tail -n 30 || true
           fi
 
-      - name: Upload arm64 artifacts
+      - name: Collect artifacts
+        run: |
+          mkdir -p "dist-artifacts/linux-${{ matrix.arch }}-debian${{ matrix.debian }}"
+
+          DEB_FILE="$(find src-tauri/target/release/bundle -type f -name "*.deb" | head -n 1 || true)"
+          if [ -n "$DEB_FILE" ]; then
+            cp -v "$DEB_FILE" "dist-artifacts/linux-${{ matrix.arch }}-debian${{ matrix.debian }}/mooncord-linux-${{ matrix.arch }}-debian${{ matrix.debian }}.deb"
+          fi
+
+          if [ -f "src-tauri/target/release/mooncord" ]; then
+            cp -v "src-tauri/target/release/mooncord" "dist-artifacts/linux-${{ matrix.arch }}-debian${{ matrix.debian }}/mooncord-linux-${{ matrix.arch }}-debian${{ matrix.debian }}"
+            chmod +x "dist-artifacts/linux-${{ matrix.arch }}-debian${{ matrix.debian }}/mooncord-linux-${{ matrix.arch }}-debian${{ matrix.debian }}"
+          fi
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: linux-arm64-artifacts
-          path: dist-artifacts/arm64
+          name: linux-${{ matrix.arch }}-debian${{ matrix.debian }}-artifacts
+          path: dist-artifacts/linux-${{ matrix.arch }}-debian${{ matrix.debian }}
           if-no-files-found: error
