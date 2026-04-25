@@ -7,7 +7,6 @@ import ShortcutBarShortcutButton from './ShortcutBarShortcutButton.vue'
 import ShortcutBarAFC from './afc/ShortcutBarAFC.vue'
 import TempDialog from './dialogs/TempDialog.vue'
 import SpeedDialog from './dialogs/SpeedDialog.vue'
-import {af} from "vuetify/locale";
 
 const appStore = useAppStore()
 const { moonraker, shortcutButtons } = storeToRefs(appStore)
