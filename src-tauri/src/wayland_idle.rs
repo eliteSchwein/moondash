@@ -14,7 +14,7 @@ use wayland_protocols::ext::idle_notify::v1::client::{
     ext_idle_notifier_v1::ExtIdleNotifierV1,
 };
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IdleEvent {
     Idled,
     Resumed,
@@ -23,6 +23,7 @@ pub enum IdleEvent {
 struct WaylandIdleState {
     notifications: Vec<ExtIdleNotificationV1>,
     tx: Sender<IdleEvent>,
+    target: IdleEvent,
     done: bool,
 }
 
@@ -33,7 +34,7 @@ pub fn wait_for_idle_or_generation_change<F>(
 where
     F: Fn() -> bool,
 {
-    let rx = start_idle_listener(timeout_seconds)?;
+    let rx = start_idle_listener(timeout_seconds, IdleEvent::Idled)?;
 
     loop {
         if should_cancel() {
@@ -43,13 +44,13 @@ where
         match rx.recv_timeout(Duration::from_millis(500)) {
             Ok(event) => return Ok(Some(event)),
             Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
-            Err(err) => return Err(format!("idle listener closed before event: {err}")),
+            Err(err) => return Err(format!("idle listener closed before idle: {err}")),
         }
     }
 }
 
 pub fn wait_for_resume_after_sleep() -> Result<(), String> {
-    let rx = start_idle_listener(1)?;
+    let rx = start_idle_listener(1, IdleEvent::Resumed)?;
 
     loop {
         match rx.recv_timeout(Duration::from_millis(500)) {
@@ -61,7 +62,10 @@ pub fn wait_for_resume_after_sleep() -> Result<(), String> {
     }
 }
 
-fn start_idle_listener(timeout_seconds: u64) -> Result<Receiver<IdleEvent>, String> {
+fn start_idle_listener(
+    timeout_seconds: u64,
+    target: IdleEvent,
+) -> Result<Receiver<IdleEvent>, String> {
     let timeout_ms = timeout_seconds
         .saturating_mul(1000)
         .min(u32::MAX as u64) as u32;
@@ -69,7 +73,7 @@ fn start_idle_listener(timeout_seconds: u64) -> Result<Receiver<IdleEvent>, Stri
     let (tx, rx) = channel();
 
     std::thread::spawn(move || {
-        if let Err(err) = run_idle_listener(timeout_ms, tx) {
+        if let Err(err) = run_idle_listener(timeout_ms, target, tx) {
             eprintln!("Wayland idle listener error: {err}");
         }
     });
@@ -77,8 +81,12 @@ fn start_idle_listener(timeout_seconds: u64) -> Result<Receiver<IdleEvent>, Stri
     Ok(rx)
 }
 
-fn run_idle_listener(timeout_ms: u32, tx: Sender<IdleEvent>) -> Result<(), String> {
-    eprintln!("starting Wayland idle listener with timeout {timeout_ms}ms");
+fn run_idle_listener(
+    timeout_ms: u32,
+    target: IdleEvent,
+    tx: Sender<IdleEvent>,
+) -> Result<(), String> {
+    eprintln!("starting Wayland idle listener with timeout {timeout_ms}ms, target {target:?}");
 
     let conn = Connection::connect_to_env()
         .map_err(|e| format!("failed to connect to Wayland: {e}"))?;
@@ -91,6 +99,7 @@ fn run_idle_listener(timeout_ms: u32, tx: Sender<IdleEvent>) -> Result<(), Strin
     let mut state = WaylandIdleState {
         notifications: Vec::new(),
         tx,
+        target,
         done: false,
     };
 
@@ -164,18 +173,17 @@ impl Dispatch<ExtIdleNotificationV1, ()> for WaylandIdleState {
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
     ) {
-        match event {
-            ext_idle_notification_v1::Event::Idled => {
-                eprintln!("Wayland idle event: idled");
-                let _ = state.tx.send(IdleEvent::Idled);
-                state.done = true;
-            }
-            ext_idle_notification_v1::Event::Resumed => {
-                eprintln!("Wayland idle event: resumed");
-                let _ = state.tx.send(IdleEvent::Resumed);
-                state.done = true;
-            }
-            _ => {}
+        let event = match event {
+            ext_idle_notification_v1::Event::Idled => IdleEvent::Idled,
+            ext_idle_notification_v1::Event::Resumed => IdleEvent::Resumed,
+            _ => return,
+        };
+
+        eprintln!("Wayland idle event: {event:?}");
+
+        if event == state.target {
+            let _ = state.tx.send(event);
+            state.done = true;
         }
     }
 }

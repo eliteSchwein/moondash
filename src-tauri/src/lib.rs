@@ -257,6 +257,18 @@ fn start_idle_display_watcher(app: AppHandle) {
 
                 if let Err(err) = wayland_power::turn_off_displays() {
                     eprintln!("turn_off_displays after idle failed: {err}");
+                    continue;
+                }
+
+                eprintln!("automatic sleep armed wake listener");
+
+                match wayland_idle::wait_for_resume_after_sleep() {
+                    Ok(()) => {
+                        turn_on_displays_with_retry("automatic idle wake");
+                    }
+                    Err(err) => {
+                        eprintln!("automatic wake listener failed: {err}");
+                    }
                 }
             }
             Ok(Some(wayland_idle::IdleEvent::Resumed)) => {
