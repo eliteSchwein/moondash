@@ -273,7 +273,8 @@ jobs:
               cargo --version
 
               npm ci
-              npm run tauri build
+              rustup target add armv7-unknown-linux-gnueabihf
+              npm run tauri build -- --target armv7-unknown-linux-gnueabihf
 
               VERSION="$(node -p "require(\"./package.json\").version")"
               OUT_DIR="dist-artifacts/${{ matrix.osname }}-armhf"
