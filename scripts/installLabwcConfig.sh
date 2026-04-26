@@ -35,8 +35,7 @@ mkdir -p "$HOME/.config/labwc"
 cat > "$HOME/.config/labwc/autostart" <<EOF
 #!/bin/sh
 swayidle -w \
-  timeout 2 'labwc -r hide_cursor' \
-  resume 'labwc -r show_cursor' &
+  timeout 2 'wtype -M alt -M super -k h -m super -m alt' &
 
 exec /usr/bin/moondash --app-config "$MCCONFIGFILE"
 EOF
@@ -46,6 +45,12 @@ chmod +x "$HOME/.config/labwc/autostart"
 cat > "$HOME/.config/labwc/rc.xml" <<'EOF'
 <?xml version="1.0"?>
 <openbox_config>
+	<keyboard>
+		<keybind key="A-W-h">
+      <action name="HideCursor" />
+      <action name="WarpCursor" x="-1" y="-1" />
+		</keybind>
+	</keyboard>
 </openbox_config>
 EOF
 

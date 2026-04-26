@@ -71,7 +71,7 @@ install_packages() {
     libgl1-mesa-dri \
     libegl-mesa0 \
     libgles2-mesa \
-    swayidle
+    swayidle wtype
 
   status_msg "Moondash deb install placeholder"
   # TODO: Later, after adding your apt server:
