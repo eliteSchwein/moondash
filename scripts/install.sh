@@ -87,10 +87,20 @@ install_service() {
   "$SCRIPTPATH/generateService.sh" --app_config="$MCCONFIGFILE" --service_suffix="${MCSERVICENAME#moondash_}"
 }
 
+install_labwc_config() {
+  if [[ -x "$SCRIPTPATH/installLabwcConfig.sh" ]]; then
+    "$SCRIPTPATH/installLabwcConfig.sh" --app_config="$MCCONFIGFILE"
+  else
+    warn_msg "installLabwcConfig.sh not found or not executable."
+    exit 1
+  fi
+}
+
 questions
 setup_custom_apt_repo_placeholder
 install_packages
 modify_user
+install_labwc_config
 install_service
 
 ok_msg "Installation finished. Reboot is recommended."

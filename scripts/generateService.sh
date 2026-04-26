@@ -36,19 +36,6 @@ if [[ ${UID} == '0' ]]; then
   exit 1
 fi
 
-install_labwc_autostart() {
-  status_msg "Installing labwc autostart"
-
-  mkdir -p "$HOME/.config/labwc"
-
-  cat > "$HOME/.config/labwc/autostart" <<EOF
-#!/bin/sh
-exec /usr/bin/moondash --app-config "$MCCONFIGFILE"
-EOF
-
-  chmod +x "$HOME/.config/labwc/autostart"
-}
-
 install_systemd_service() {
   status_msg "Installing Moondash kiosk unit file"
 
@@ -67,5 +54,4 @@ install_systemd_service() {
   ok_msg "Installed and restarted $MCSERVICENAME.service"
 }
 
-install_labwc_autostart
 install_systemd_service
