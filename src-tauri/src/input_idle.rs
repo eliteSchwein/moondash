@@ -1,4 +1,4 @@
-use evdev::{Device, InputEventKind};
+use evdev::{Device, EventType};
 use std::{
     fs,
     path::PathBuf,
@@ -72,7 +72,7 @@ fn spawn_device_reader(mut device: Device, tx: Sender<()>) {
         match device.fetch_events() {
             Ok(events) => {
                 for event in events {
-                    if is_real_input_event(event.kind()) {
+                    if is_real_input_event(event.event_type()) {
                         let _ = tx.send(());
                     }
                 }
@@ -126,12 +126,12 @@ fn is_event_device(path: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
-fn is_real_input_event(kind: InputEventKind) -> bool {
+fn is_real_input_event(event_type: EventType) -> bool {
     matches!(
-        kind,
-        InputEventKind::Key(_)
-            | InputEventKind::RelAxis(_)
-            | InputEventKind::AbsAxis(_)
-            | InputEventKind::Switch(_)
+        event_type,
+        EventType::KEY
+            | EventType::RELATIVE
+            | EventType::ABSOLUTE
+            | EventType::SWITCH
     )
 }

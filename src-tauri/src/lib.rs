@@ -190,21 +190,22 @@ fn get_idle_generation(app: &AppHandle) -> u64 {
         .unwrap_or(0)
 }
 
-fn turn_on_displays_with_retry(reason: &str) {
-    eprintln!("{reason}, turning displays on");
+fn read_idle_config(app: &AppHandle) -> Option<(bool, u64)> {
+    let state = app.try_state::<AppConfig>()?;
+    let config = state.0.lock().ok()?;
+    let system = config.get("system").and_then(Value::as_object);
 
-    for attempt in 1..=3 {
-        match wayland_power::turn_on_displays() {
-            Ok(()) => {
-                eprintln!("turn_on_displays succeeded for reason: {reason}");
-                break;
-            }
-            Err(err) => {
-                eprintln!("turn_on_displays failed, attempt {attempt}, reason {reason}: {err}");
-                thread::sleep(Duration::from_millis(250));
-            }
-        }
-    }
+    let enabled = system
+        .and_then(|s| s.get("use_idle_timeout"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+
+    let timeout = system
+        .and_then(|s| s.get("idle_timeout"))
+        .and_then(Value::as_u64)
+        .unwrap_or(900);
+
+    Some((enabled, timeout.max(1)))
 }
 
 fn start_idle_display_watcher(app: AppHandle) {
