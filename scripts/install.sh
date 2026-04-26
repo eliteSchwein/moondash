@@ -70,7 +70,8 @@ install_packages() {
     libayatana-appindicator3-1 \
     libgl1-mesa-dri \
     libegl-mesa0 \
-    libgles2-mesa
+    libgles2-mesa \
+    unclutter
 
   status_msg "Moondash deb install placeholder"
   # TODO: Later, after adding your apt server:

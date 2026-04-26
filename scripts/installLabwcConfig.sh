@@ -34,6 +34,7 @@ mkdir -p "$HOME/.config/labwc"
 
 cat > "$HOME/.config/labwc/autostart" <<EOF
 #!/bin/sh
+unclutter --timeout 2 --jitter 1 --ignore-scrolling &
 exec /usr/bin/moondash --app-config "$MCCONFIGFILE"
 EOF
 
@@ -42,10 +43,6 @@ chmod +x "$HOME/.config/labwc/autostart"
 cat > "$HOME/.config/labwc/rc.xml" <<'EOF'
 <?xml version="1.0"?>
 <openbox_config>
-  <mouse>
-    <hideCursor>yes</hideCursor>
-    <hideCursorDelay>2000</hideCursorDelay>
-  </mouse>
 </openbox_config>
 EOF
 
