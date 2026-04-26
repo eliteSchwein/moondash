@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "visible": false,
         "title": "moondash",
         "width": 800,
         "height": 480,

@@ -6,6 +6,7 @@ import Navigation from './components/Navigation.vue'
 import { useAppStore } from './stores/app'
 import { moonraker } from './plugins/moonraker'
 import { resolveLocale } from './plugins/i18n'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 
 const appStore = useAppStore()
 const { locale } = useI18n({ useScope: 'global' })
@@ -127,6 +128,8 @@ onMounted(async () => {
   } catch (err) {
     console.error('config/moonraker init failed:', err)
   }
+
+  await getCurrentWindow().show()
 })
 
 onBeforeUnmount(() => {
