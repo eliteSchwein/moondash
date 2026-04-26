@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { invoke } from '@tauri-apps/api/core'
 import { useAppStore } from '@/stores/app'
 
 const appStore = useAppStore()
@@ -108,6 +109,10 @@ function togglePause() {
     frozenFull.value = liveFull.value
   }
 }
+
+async function sleepDisplay() {
+  await invoke('turn_off_displays')
+}
 </script>
 
 <template>
@@ -126,14 +131,25 @@ function togglePause() {
           </v-chip>
         </div>
 
-        <v-btn
-            :color="paused ? 'warning' : undefined"
-            :variant="paused ? 'flat' : 'tonal'"
-            size="small"
-            @click="togglePause"
-        >
-          {{ paused ? 'Resume' : 'Pause' }}
-        </v-btn>
+        <div class="store-header-actions">
+          <v-btn
+              color="primary"
+              variant="tonal"
+              size="small"
+              @click="sleepDisplay"
+          >
+            Sleep
+          </v-btn>
+
+          <v-btn
+              :color="paused ? 'warning' : undefined"
+              :variant="paused ? 'flat' : 'tonal'"
+              size="small"
+              @click="togglePause"
+          >
+            {{ paused ? 'Resume' : 'Pause' }}
+          </v-btn>
+        </div>
       </div>
 
       <div class="store-tabs-wrap">
@@ -200,6 +216,12 @@ function togglePause() {
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.store-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .store-tabs-wrap {
