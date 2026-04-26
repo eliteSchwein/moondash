@@ -10,7 +10,7 @@ permissions:
 jobs:
   frontend-build:
     name: Build frontend
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
 
     steps:
       - name: Checkout release tag
@@ -137,7 +137,7 @@ jobs:
   build-release-armhf:
     name: Build release Linux armhf ${{ matrix.osname }}
     needs: frontend-build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, ARM]
 
     strategy:
       fail-fast: false
@@ -161,15 +161,9 @@ jobs:
           name: frontend-dist
           path: .
 
-      - name: Set up QEMU for armhf
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm
-
-      - name: Build Tauri app armhf via QEMU
+      - name: Build release armhf in Debian ${{ matrix.debian }}
         run: |
           docker run --rm \
-            --platform linux/arm/v7 \
             -v "$PWD:/work" \
             -w /work \
             arm32v7/debian:${{ matrix.debian }} \
@@ -201,6 +195,9 @@ jobs:
 
               . "$HOME/.cargo/env"
 
+              rustc --version
+              cargo --version
+
               npm ci
               npm run tauri build
 
@@ -223,6 +220,7 @@ jobs:
                 cp "$BIN_FILE" "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf"
                 chmod +x "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf"
                 file "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf" || true
+                objdump -T "release-assets/moondash_${VERSION}.${{ matrix.osname }}_armhf" | grep GLIBC_ | sort -Vu | tail -n 30 || true
               fi
             '
 
