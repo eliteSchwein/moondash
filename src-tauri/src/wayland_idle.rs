@@ -87,7 +87,7 @@ fn run_idle_listener(timeout_ms: u32, tx: Sender<IdleEvent>) -> Result<(), Strin
         .map_err(|_| "compositor does not expose wl_seat".to_string())?;
 
     let notification =
-        idle_notifier.get_input_idle_notification(timeout_ms, &seat, &qh, ());
+        idle_notifier.get_idle_notification(timeout_ms, &seat, &qh, ());
 
     state.notifications.push(notification);
 
