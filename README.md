@@ -7,6 +7,8 @@
 ![Tested](https://img.shields.io/badge/rpi-4-brightgreen)
 ![Tested](https://img.shields.io/badge/rpi-3-brightgreen)
 
+![Screenshot_1](/images/img.png)
+
 ## Discord Community Server
 
 [![Discord](https://discord.com/api/guilds/865168027652456448/widget.png?style=banner2)](https://discord.gg/TdxUZFZtVa)
