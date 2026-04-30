@@ -229,7 +229,6 @@ async function savePressureAdvanceSmoothTime() {
                     max="300"
                     step="1"
                     suffix="%"
-                    :placeholder="t('tune.flow.placeholder')"
                     :disabled="!!savingAction"
                 />
               </div>
@@ -322,7 +321,6 @@ async function savePressureAdvanceSmoothTime() {
                     min="0"
                     max="2"
                     step="0.001"
-                    :placeholder="t('tune.pa.placeholder')"
                     :disabled="!!savingAction"
                 />
               </div>
@@ -416,7 +414,6 @@ async function savePressureAdvanceSmoothTime() {
                     max="1"
                     step="0.001"
                     suffix="s"
-                    :placeholder="t('tune.pa_smooth.placeholder')"
                     :disabled="!!savingAction"
                 />
               </div>

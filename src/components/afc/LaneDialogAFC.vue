@@ -180,7 +180,6 @@ async function saveDialog() {
                 variant="outlined"
                 density="comfortable"
                 hide-details
-                :placeholder="t('afc.edit.select_material')"
                 :disabled="saving"
             />
           </div>
@@ -213,9 +212,9 @@ async function saveDialog() {
                   type="button"
                   class="control-btn"
                   :disabled="saving"
-                  @click="adjustWeight(-100)"
+                  @click="adjustWeight(-50)"
               >
-                -100
+                -50
               </button>
               <button
                   type="button"
@@ -244,7 +243,6 @@ async function saveDialog() {
                     min="0"
                     step="1"
                     suffix="g"
-                    :placeholder="t('afc.edit.weight_placeholder')"
                     :disabled="saving"
                 />
               </div>
@@ -269,9 +267,9 @@ async function saveDialog() {
                   type="button"
                   class="control-btn"
                   :disabled="saving"
-                  @click="adjustWeight(100)"
+                  @click="adjustWeight(50)"
               >
-                +100
+                +50
               </button>
             </div>
           </div>
