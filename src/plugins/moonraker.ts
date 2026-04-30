@@ -1,5 +1,6 @@
-import {listen, type UnlistenFn} from '@tauri-apps/api/event'
-import {invoke} from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
+import { useAppStore } from '../stores/app'
 
 type JsonRpcId = number
 
@@ -59,12 +60,15 @@ class MoonrakerConnection {
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null
     private manuallyDisconnected = false
     private ready = false
+    private connectionGeneration = 0
+    private syncingAfterReconnect = false
 
     private pending = new Map<JsonRpcId, PendingRequest>()
     private notificationHandlers = new Map<string, Set<NotificationHandler>>()
     private connectionHandlers = new Set<ConnectionHandler>()
     private errorHandlers = new Set<ErrorHandler>()
     private configListener: UnlistenFn | null = null
+    private appCleanupHandlers: Array<() => void> = []
 
     private subscriptionObjects: Record<string, string[] | null> = {
         webhooks: ['state', 'state_message'],
@@ -124,6 +128,80 @@ class MoonrakerConnection {
         ]
     }
 
+    registerAppHandlers() {
+        if (this.appCleanupHandlers.length) return
+
+        const appStore = useAppStore()
+
+        this.appCleanupHandlers = [
+            this.onConnectionChange(async (status) => {
+                appStore.setWebsocketConnected(status.connected)
+                appStore.setMoonrakerReady(status.ready)
+
+                if (!status.connected) {
+                    appStore.resetMoonrakerData()
+                    appStore.resetFiles()
+                    return
+                }
+
+                await this.refreshAppMoonrakerState()
+            }),
+
+            this.onError((error) => {
+                console.error('moonraker error:', error)
+            }),
+
+            ...this.registerDefaultNotifications(),
+
+            this.onNotification('notify_status_update', (params) => {
+                const payload = Array.isArray(params) ? params[0] : params
+                appStore.applyMoonrakerSubscriptionPayload(payload)
+            }),
+
+            this.onNotification('notify_proc_stat_update', (params) => {
+                const payload = Array.isArray(params) ? params[0] : params
+                appStore.applyMoonrakerProcStats(payload)
+            }),
+
+            this.onNotification('notify_klippy_ready', async () => {
+                appStore.setMoonrakerReady(true)
+                await this.refreshAppMoonrakerState()
+            }),
+
+            this.onNotification('notify_klippy_disconnected', () => {
+                appStore.setMoonrakerReady(false)
+            }),
+
+            this.onNotification('notify_klippy_shutdown', () => {
+                appStore.setMoonrakerReady(false)
+            }),
+        ]
+    }
+
+    unregisterAppHandlers() {
+        this.appCleanupHandlers.forEach((cleanup) => cleanup())
+        this.appCleanupHandlers = []
+        this.syncingAfterReconnect = false
+    }
+
+    async refreshAppMoonrakerState() {
+        if (this.syncingAfterReconnect) return
+        if (!this.getStatus().connected) return
+
+        const appStore = useAppStore()
+
+        try {
+            this.syncingAfterReconnect = true
+
+            const initialObjects = await this.registerAllKnownObjects()
+            appStore.applyMoonrakerSubscriptionPayload(initialObjects)
+        } catch (error) {
+            console.warn('moonraker refresh after reconnect failed', error)
+        } finally {
+            this.syncingAfterReconnect = false
+        }
+    }
+
     async connect(config: MoonrakerConfig): Promise<void> {
         this.currentConfig = config
         this.manuallyDisconnected = false
@@ -132,37 +210,66 @@ class MoonrakerConnection {
         const url = this.makeWebSocketUrl(config.ip)
         this.currentUrl = url
 
-        if (this.ws) {
-            this.ws.close()
-            this.ws = null
+        const generation = ++this.connectionGeneration
+        const previousWs = this.ws
+
+        if (previousWs) {
+            previousWs.onopen = null
+            previousWs.onmessage = null
+            previousWs.onerror = null
+            previousWs.onclose = null
+            previousWs.close()
         }
+
+        this.ws = null
+        this.ready = false
+        this.emitConnection()
+        this.rejectAllPending(new Error('Moonraker websocket replaced'))
 
         await new Promise<void>((resolve, reject) => {
             const ws = new WebSocket(url)
             this.ws = ws
 
+            const isCurrentSocket = () => {
+                return this.ws === ws && this.connectionGeneration === generation
+            }
+
             ws.onopen = async () => {
+                if (!isCurrentSocket()) return
+
                 try {
                     this.ready = false
                     this.emitConnection()
+
                     await this.initializeConnection()
+
+                    if (!isCurrentSocket()) return
+
                     this.emitConnection()
                     resolve()
                 } catch (error) {
+                    if (!isCurrentSocket()) return
+
                     this.handleError(error)
                     reject(error)
+                    ws.close()
                 }
             }
 
             ws.onmessage = (event) => {
+                if (!isCurrentSocket()) return
                 this.handleMessage(event.data)
             }
 
             ws.onerror = (event) => {
+                if (!isCurrentSocket()) return
                 this.handleError(event)
             }
 
             ws.onclose = () => {
+                if (!isCurrentSocket()) return
+
+                this.ws = null
                 this.ready = false
                 this.emitConnection()
                 this.rejectAllPending(new Error('Moonraker websocket closed'))
@@ -175,14 +282,15 @@ class MoonrakerConnection {
     }
 
     async reconnect(): Promise<void> {
-        if (!this.currentConfig) {
-            const config = await this.loadConfigFromBackend()
-            if (!config?.websocket?.ip) {
-                throw new Error('No Moonraker websocket config available')
-            }
+        const config = await this.loadConfigFromBackend()
 
+        if (config?.websocket?.ip) {
             await this.connect({ ip: config.websocket.ip })
             return
+        }
+
+        if (!this.currentConfig) {
+            throw new Error('No Moonraker websocket config available')
         }
 
         await this.connect(this.currentConfig)
@@ -192,16 +300,24 @@ class MoonrakerConnection {
         this.manuallyDisconnected = true
         this.ready = false
         this.clearReconnectTimer()
+        this.connectionGeneration++
 
         if (this.ws) {
+            this.ws.onopen = null
+            this.ws.onmessage = null
+            this.ws.onerror = null
+            this.ws.onclose = null
             this.ws.close()
             this.ws = null
         }
 
+        this.rejectAllPending(new Error('Moonraker websocket disconnected'))
         this.emitConnection()
     }
 
     async startAutoConnectFromConfig() {
+        this.registerAppHandlers()
+
         const config = await this.loadConfigFromBackend()
         if (config?.websocket?.ip) {
             await this.connect({ ip: config.websocket.ip })
@@ -219,6 +335,7 @@ class MoonrakerConnection {
                     await this.connect({ ip: newIp })
                 } catch (error) {
                     this.handleError(error)
+                    this.scheduleReconnect()
                 }
             })
         }
@@ -229,6 +346,8 @@ class MoonrakerConnection {
             this.configListener()
             this.configListener = null
         }
+
+        this.unregisterAppHandlers()
     }
 
     async call<T = unknown>(
@@ -455,7 +574,7 @@ class MoonrakerConnection {
     }
 
     private scheduleReconnect() {
-        if (this.reconnectTimer || !this.currentConfig) return
+        if (this.reconnectTimer || !this.currentConfig || this.manuallyDisconnected) return
 
         this.reconnectTimer = setTimeout(async () => {
             this.reconnectTimer = null

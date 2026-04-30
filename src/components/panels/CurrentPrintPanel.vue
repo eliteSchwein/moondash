@@ -34,12 +34,15 @@ const printState = computed(() => moonraker.value.printStats.state?.toLowerCase(
 const printFilename = computed(() => moonraker.value.printStats.filename ?? '')
 const fileDisplayName = computed(() => printFilename.value.replace(/\.gcode$/i, ''))
 
+const websocketConnected = computed(() => appStore.isWebsocketConnected)
+const websocketIp = computed(() => appStore.getWebsocketIp)
+
 const hasLoadedFile = computed(() => Boolean(printFilename.value))
 const isPrinting = computed(() => printState.value === 'printing')
 const isPaused = computed(() => printState.value === 'paused')
 const isFinished = computed(() => (
-  printState.value === 'complete' ||
-  printState.value === 'cancelled'
+    printState.value === 'complete' ||
+    printState.value === 'cancelled'
 ))
 const isActivePrint = computed(() => isPrinting.value || isPaused.value || isFinished.value)
 
@@ -47,7 +50,6 @@ const progressRatio = computed(() => {
   const displayProgress = moonraker.value.displayStatus.progress
   const fileProgress = moonraker.value.virtualSdcard.progress
 
-  // Prefer slicer/M73 progress ONLY if it looks valid
   if (
       typeof displayProgress === 'number' &&
       Number.isFinite(displayProgress) &&
@@ -56,7 +58,6 @@ const progressRatio = computed(() => {
     return Math.max(0, Math.min(1, displayProgress))
   }
 
-  // Fallback: file position progress
   if (
       typeof fileProgress === 'number' &&
       Number.isFinite(fileProgress)
@@ -180,20 +181,30 @@ const canSkipObject = computed(() => {
 })
 
 const httpBase = computed(() => {
-  const wsUrl = moonrakerClient.getStatus().url
-  if (!wsUrl) return ''
+  const ip = websocketIp.value?.trim()
+  if (!ip) return ''
 
   try {
-    const parsed = new URL(wsUrl)
-    const protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
-    return `${protocol}//${parsed.host}`
+    if (ip.startsWith('ws://') || ip.startsWith('wss://')) {
+      const parsed = new URL(ip)
+      const protocol = parsed.protocol === 'wss:' ? 'https:' : 'http:'
+      return `${protocol}//${parsed.host}`
+    }
+
+    if (ip.startsWith('http://') || ip.startsWith('https://')) {
+      const parsed = new URL(ip)
+      return `${parsed.protocol}//${parsed.host}`
+    }
+
+    const parsed = new URL(`http://${ip}`)
+    return `${parsed.protocol}//${parsed.host}`
   } catch {
     return ''
   }
 })
 
 async function loadCurrentFileAssets() {
-  if (!printFilename.value) {
+  if (!printFilename.value || !websocketConnected.value || !httpBase.value) {
     currentFileThumbnails.value = []
     currentFileMetadata.value = null
     return
@@ -313,8 +324,13 @@ async function clearFile() {
 }
 
 watch(
-    printFilename,
-    async () => {
+    [printFilename, websocketConnected, websocketIp],
+    async ([filename, connected, ip]) => {
+      currentFileThumbnails.value = []
+      currentFileMetadata.value = null
+
+      if (!filename || !connected || !ip) return
+
       await loadCurrentFileAssets()
     },
     { immediate: true },
