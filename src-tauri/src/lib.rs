@@ -13,6 +13,7 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, Manager, PhysicalSize, Size, State};
 use tauri_plugin_cli::CliExt;
+use tauri::WindowEvent;
 
 struct AppConfig(Mutex<Value>);
 struct WatchedConfigPath(Mutex<Option<String>>);
@@ -978,6 +979,11 @@ fn start_config_watcher(app: AppHandle, config_path: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .on_window_event(|_window, event| {
+            if let WindowEvent::Resized(_) = event {
+                std::thread::sleep(std::time::Duration::from_nanos(1));
+            }
+        })
         .manage(AppConfig(Mutex::new(default_config())))
         .manage(WatchedConfigPath(Mutex::new(None)))
         .manage(IdleWatcherGeneration(Mutex::new(0)))
