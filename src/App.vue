@@ -7,6 +7,7 @@ import { useAppStore } from './stores/app'
 import { moonraker } from './plugins/moonraker'
 import { resolveLocale } from './plugins/i18n'
 import { getCurrentWindow } from '@tauri-apps/api/window'
+import IdleOverlay from "@/components/IdleOverlay.vue";
 
 const appStore = useAppStore()
 const { locale } = useI18n({ useScope: 'global' })
@@ -76,6 +77,7 @@ onBeforeUnmount(() => {
       :style="{ zoom: String(appStore.getZoom) }"
   >
     <v-layout>
+      <IdleOverlay/>
       <Navigation />
       <router-view />
     </v-layout>

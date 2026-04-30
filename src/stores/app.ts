@@ -16,6 +16,7 @@ type DevConfig = {
 type SystemConfig = {
   language?: string | null
   idle_timeout?: number
+  idle_unlock?: number
   use_idle_timeout?: boolean
 }
 
@@ -239,7 +240,9 @@ export const useAppStore = defineStore('app', {
     debug: false as boolean,
     language: null as string | null,
     idleTimeout: 360 as number,
+    idleUnlock: 500 as number,
     useIdleTimeout: true as boolean,
+    isSleeping: false as boolean,
     primaryColor: null as string | null,
     secondaryColor: null as string | null,
     shortcutButtons: [] as ShortcutButtonConfig[],
@@ -342,7 +345,9 @@ export const useAppStore = defineStore('app', {
     isDebugEnabled: (state) => state.debug,
     getLanguage: (state) => state.language,
     getIdleTimeout: (state) => state.idleTimeout,
+    getIdleUnlock: (state) => state.idleUnlock,
     getUseIdleTimeout: (state) => state.useIdleTimeout,
+    getIsSleeping: (state) => state.isSleeping,
     getPrimaryColor: (state) => state.primaryColor,
     getSecondaryColor: (state) => state.secondaryColor,
     getShortcutButtons: (state) => state.shortcutButtons,
@@ -405,8 +410,18 @@ export const useAppStore = defineStore('app', {
       }
     },
 
+    setIdleUnlock(value: number) {
+      if (Number.isFinite(value) && value >= 0) {
+        this.idleUnlock = value
+      }
+    },
+
     setUseIdleTimeout(value: boolean) {
       this.useIdleTimeout = value
+    },
+
+    setIsSleeping(value: boolean) {
+      this.isSleeping = value
     },
 
     setWebsocketIp(ip: string) {
@@ -466,6 +481,10 @@ export const useAppStore = defineStore('app', {
         this.setIdleTimeout(config.system.idle_timeout)
       }
 
+      if (typeof config.system?.idle_unlock === 'number') {
+        this.setIdleUnlock(config.system.idle_unlock)
+      }
+
       if (typeof config.system?.use_idle_timeout === 'boolean') {
         this.setUseIdleTimeout(config.system.use_idle_timeout)
       }
@@ -515,6 +534,7 @@ export const useAppStore = defineStore('app', {
       system?: {
         language?: string | null
         idle_timeout?: number
+        idle_unlock?: number
         use_idle_timeout?: boolean
       }
       shortcutbuttons?: ShortcutButtonConfig[]

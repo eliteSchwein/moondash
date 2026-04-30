@@ -76,12 +76,13 @@ fn turn_on_displays() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn sleep_displays_until_input() -> Result<(), String> {
+fn sleep_displays_until_input(app: AppHandle) -> Result<(), String> {
     eprintln!("sleep_displays_until_input command called");
 
     match wayland_power::turn_off_displays() {
         Ok(()) => {
             eprintln!("displays turned off");
+            emit_sleeping(&app);
         }
         Err(err) => {
             eprintln!("failed to turn displays off: {err}");
@@ -89,7 +90,7 @@ fn sleep_displays_until_input() -> Result<(), String> {
         }
     }
 
-    thread::spawn(|| {
+    thread::spawn(move || {
         eprintln!("manual sleep: waiting for input activity");
 
         match input_idle::wait_for_input_activity() {
@@ -100,6 +101,7 @@ fn sleep_displays_until_input() -> Result<(), String> {
                     match wayland_power::turn_on_displays() {
                         Ok(()) => {
                             eprintln!("manual sleep: display wake succeeded");
+                            emit_awake_after_delay(&app);
                             break;
                         }
                         Err(err) => {
@@ -218,6 +220,43 @@ fn read_idle_config(app: &AppHandle) -> Option<(bool, u64)> {
     Some((enabled, timeout.max(1)))
 }
 
+fn read_idle_unlock_delay(app: &AppHandle) -> u64 {
+    app.try_state::<AppConfig>()
+        .and_then(|state| {
+            state
+                .0
+                .lock()
+                .ok()
+                .and_then(|config| {
+                    config
+                        .get("system")
+                        .and_then(Value::as_object)
+                        .and_then(|system| system.get("idle_unlock"))
+                        .and_then(Value::as_u64)
+                })
+        })
+        .unwrap_or(500)
+}
+
+fn emit_sleep_state(app: &AppHandle, sleeping: bool) {
+    let _ = app.emit(
+        "display-sleep-state",
+        json!({
+            "sleeping": sleeping
+        }),
+    );
+}
+
+fn emit_sleeping(app: &AppHandle) {
+    emit_sleep_state(app, true);
+}
+
+fn emit_awake_after_delay(app: &AppHandle) {
+    let delay_ms = read_idle_unlock_delay(app);
+    thread::sleep(Duration::from_millis(delay_ms));
+    emit_sleep_state(app, false);
+}
+
 fn start_idle_display_watcher(app: AppHandle) {
     thread::spawn(move || loop {
         let generation = get_idle_generation(&app);
@@ -266,6 +305,7 @@ fn start_idle_display_watcher(app: AppHandle) {
                                 Ok(()) => {
                                     eprintln!("automatic wake succeeded");
                                     sleeping = false;
+                                    emit_awake_after_delay(&app);
                                     break;
                                 }
                                 Err(err) => {
@@ -284,6 +324,7 @@ fn start_idle_display_watcher(app: AppHandle) {
                             Ok(()) => {
                                 eprintln!("automatic display sleep succeeded");
                                 sleeping = true;
+                                emit_sleeping(&app);
                             }
                             Err(err) => {
                                 eprintln!("automatic display sleep failed: {err}");
@@ -351,6 +392,12 @@ fn apply_editable_config(target: &mut Value, patch: &Value) {
         if let Some(value) = system_patch.get("idle_timeout") {
             if value.is_number() {
                 system_obj.insert("idle_timeout".to_string(), value.clone());
+            }
+        }
+
+        if let Some(value) = system_patch.get("idle_unlock") {
+            if value.is_number() {
+                system_obj.insert("idle_unlock".to_string(), value.clone());
             }
         }
 
@@ -620,6 +667,7 @@ fn default_config() -> Value {
         "system": {
             "language": "en",
             "idle_timeout": 900,
+            "idle_unlock": 250,
             "use_idle_timeout": true
         }
     })
