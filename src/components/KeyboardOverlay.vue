@@ -1,10 +1,19 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+
+type KeyboardMode = 'alpha' | 'numeric' | 'symbols'
 
 type KeyboardKey = {
   label: string
   value?: string
-  action?: 'backspace' | 'shift' | 'space' | 'enter' | 'close' | 'clear'
+  action?:
+      | 'backspace'
+      | 'shift'
+      | 'space'
+      | 'enter'
+      | 'close'
+      | 'clear'
+      | 'cycle-mode'
   wide?: boolean
   extraWide?: boolean
 }
@@ -29,7 +38,47 @@ const emit = defineEmits<{
 }>()
 
 const shifted = defineModel<boolean>('shifted', { default: false })
+const keyboardMode = ref<KeyboardMode>(props.layout === 'numeric' ? 'numeric' : 'alpha')
+
 const previewValue = computed(() => props.modelValue)
+
+const nextModeLabel = computed(() => {
+  switch (keyboardMode.value) {
+    case 'alpha':
+      return '123'
+    case 'numeric':
+      return '#+='
+    case 'symbols':
+    default:
+      return 'ABC'
+  }
+})
+
+watch(
+    () => props.layout,
+    (layout) => {
+      keyboardMode.value = layout === 'numeric' ? 'numeric' : 'alpha'
+      shifted.value = false
+    },
+)
+
+watch(
+    () => props.visible,
+    (visible) => {
+      if (visible) {
+        keyboardMode.value = props.layout === 'numeric' ? 'numeric' : 'alpha'
+        shifted.value = false
+        window.addEventListener('keydown', handlePhysicalKeyboard, true)
+      } else {
+        window.removeEventListener('keydown', handlePhysicalKeyboard, true)
+      }
+    },
+    { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handlePhysicalKeyboard, true)
+})
 
 const alphaRows = computed<KeyboardKey[][]>(() => {
   const letters1 = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p']
@@ -49,42 +98,115 @@ const alphaRows = computed<KeyboardKey[][]>(() => {
       ...letters3.map(mapKey),
       { label: '⌫', action: 'backspace', wide: true },
     ],
-    [
-      { label: 'Clear', action: 'clear', wide: true },
-      { label: 'Space', action: 'space', extraWide: true },
-      { label: 'Enter', action: 'enter', wide: true },
-      { label: 'Close', action: 'close', wide: true },
-    ],
   ]
 })
 
 const numericRows = computed<KeyboardKey[][]>(() => [
-  ['1', '2', '3'].map((k) => ({ label: k, value: k })),
-  ['4', '5', '6'].map((k) => ({ label: k, value: k })),
-  ['7', '8', '9'].map((k) => ({ label: k, value: k })),
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((k) => ({ label: k, value: k })),
+  ['-', '/', ':', ';', '(', ')', '$', '&', '@', '"'].map((k) => ({ label: k, value: k })),
   [
-    { label: '.', value: '.' },
-    { label: '0', value: '0' },
-    { label: '⌫', action: 'backspace' },
-  ],
-  [
-    { label: 'Clear', action: 'clear', wide: true },
-    { label: 'Enter', action: 'enter', wide: true },
-    { label: 'Close', action: 'close', wide: true },
+    ...['.', ',', '?', '!', "'"].map((k) => ({ label: k, value: k })),
+    { label: '⌫', action: 'backspace', wide: true },
   ],
 ])
 
-const rows = computed(() => {
-  return props.layout === 'numeric' ? numericRows.value : alphaRows.value
+const symbolsRows = computed<KeyboardKey[][]>(() => [
+  ['[', ']', '{', '}', '#', '%', '^', '*', '+', '='].map((k) => ({ label: k, value: k })),
+  ['_', '\\', '|', '~', '<', '>', '€', '£', '¥', '•'].map((k) => ({ label: k, value: k })),
+  [
+    ...['.', ',', '?', '!', '`'].map((k) => ({ label: k, value: k })),
+    { label: '⌫', action: 'backspace', wide: true },
+  ],
+])
+
+const inputRows = computed(() => {
+  switch (keyboardMode.value) {
+    case 'numeric':
+      return numericRows.value
+    case 'symbols':
+      return symbolsRows.value
+    case 'alpha':
+    default:
+      return alphaRows.value
+  }
 })
+
+const bottomRow = computed<KeyboardKey[]>(() => [
+  { label: nextModeLabel.value, action: 'cycle-mode', wide: true },
+  { label: 'Clear', action: 'clear', wide: true },
+  { label: 'Space', action: 'space', extraWide: true },
+  { label: 'Enter', action: 'enter', wide: true },
+  { label: 'Close', action: 'close', wide: true },
+])
+
+function handlePhysicalKeyboard(event: KeyboardEvent) {
+  if (!props.visible) {
+    return
+  }
+
+  if (event.ctrlKey || event.metaKey || event.altKey) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+
+  switch (event.key) {
+    case 'Backspace':
+      emit('update:modelValue', props.modelValue.slice(0, -1))
+      return
+    case 'Delete':
+      emit('update:modelValue', '')
+      return
+    case 'Enter':
+      emit('enter', props.modelValue)
+      return
+    case 'Escape':
+      emit('close')
+      return
+    case 'Tab':
+      emit('update:modelValue', props.modelValue + '\t')
+      return
+    case ' ':
+    case 'Spacebar':
+      emit('update:modelValue', props.modelValue + ' ')
+      return
+  }
+
+  if (event.key.length === 1) {
+    emit('update:modelValue', props.modelValue + event.key)
+
+    if (keyboardMode.value === 'alpha' && shifted.value) {
+      shifted.value = false
+    }
+  }
+}
+
+function cycleMode() {
+  switch (keyboardMode.value) {
+    case 'alpha':
+      keyboardMode.value = 'numeric'
+      break
+    case 'numeric':
+      keyboardMode.value = 'symbols'
+      break
+    case 'symbols':
+    default:
+      keyboardMode.value = 'alpha'
+      break
+  }
+
+  shifted.value = false
+}
 
 function pressKey(key: KeyboardKey) {
   if (key.value !== undefined) {
     emit('update:modelValue', props.modelValue + key.value)
 
-    if (props.layout === 'default' && shifted.value) {
+    if (keyboardMode.value === 'alpha' && shifted.value) {
       shifted.value = false
     }
+
     return
   }
 
@@ -107,6 +229,9 @@ function pressKey(key: KeyboardKey) {
     case 'close':
       emit('close')
       break
+    case 'cycle-mode':
+      cycleMode()
+      break
   }
 }
 </script>
@@ -128,7 +253,7 @@ function pressKey(key: KeyboardKey) {
 
         <div class="keyboard-overlay__rows">
           <div
-              v-for="(row, rowIndex) in rows"
+              v-for="(row, rowIndex) in inputRows"
               :key="rowIndex"
               class="keyboard-overlay__row"
           >
@@ -141,6 +266,23 @@ function pressKey(key: KeyboardKey) {
                   'keyboard-overlay__key--wide': key.wide,
                   'keyboard-overlay__key--extra-wide': key.extraWide,
                   'keyboard-overlay__key--active': key.action === 'shift' && shifted,
+                  'keyboard-overlay__key--action': !!key.action,
+                }"
+                @click="pressKey(key)"
+            >
+              {{ key.label }}
+            </button>
+          </div>
+
+          <div class="keyboard-overlay__row keyboard-overlay__row--bottom">
+            <button
+                v-for="(key, keyIndex) in bottomRow"
+                :key="`bottom-${keyIndex}-${key.label}`"
+                type="button"
+                class="keyboard-overlay__key"
+                :class="{
+                  'keyboard-overlay__key--wide': key.wide,
+                  'keyboard-overlay__key--extra-wide': key.extraWide,
                   'keyboard-overlay__key--action': !!key.action,
                 }"
                 @click="pressKey(key)"
@@ -215,6 +357,10 @@ function pressKey(key: KeyboardKey) {
   justify-content: center;
 }
 
+.keyboard-overlay__row--bottom {
+  justify-content: center;
+}
+
 .keyboard-overlay__key {
   appearance: none;
   border: none;
@@ -253,5 +399,35 @@ function pressKey(key: KeyboardKey) {
 
 .keyboard-overlay__key--extra-wide {
   min-width: 180px;
+}
+
+@media (max-width: 720px) {
+  .keyboard-overlay__panel {
+    padding: 8px;
+  }
+
+  .keyboard-overlay__rows {
+    gap: 6px;
+  }
+
+  .keyboard-overlay__row {
+    gap: 6px;
+  }
+
+  .keyboard-overlay__key {
+    min-width: 36px;
+    height: 46px;
+    padding: 0 9px;
+    border-radius: 12px;
+    font-size: 0.95rem;
+  }
+
+  .keyboard-overlay__key--wide {
+    min-width: 58px;
+  }
+
+  .keyboard-overlay__key--extra-wide {
+    min-width: 120px;
+  }
 }
 </style>
