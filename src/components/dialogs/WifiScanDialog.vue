@@ -32,10 +32,47 @@ const dialogOpen = computed({
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
+const sortedVisibleNetworks = computed(() => {
+  const bySsid = new Map<string, WifiNetwork>()
+
+  for (const network of props.visibleNetworks) {
+    const ssid = network.ssid.trim()
+    if (!ssid) continue
+
+    const existing = bySsid.get(ssid)
+
+    if (!existing) {
+      bySsid.set(ssid, {
+        ...network,
+        ssid,
+      })
+      continue
+    }
+
+    const existingSignal = existing.signalPercent ?? -1
+    const nextSignal = network.signalPercent ?? -1
+
+    if (nextSignal > existingSignal) {
+      bySsid.set(ssid, {
+        ...network,
+        ssid,
+      })
+    }
+  }
+
+  return [...bySsid.values()].sort((a, b) => {
+    const signalDiff = (b.signalPercent ?? -1) - (a.signalPercent ?? -1)
+    if (signalDiff !== 0) return signalDiff
+
+    return a.ssid.localeCompare(b.ssid, undefined, { sensitivity: 'base' })
+  })
+})
+
 function signalLabel(percent: number | null | undefined): string {
   if (typeof percent !== 'number' || !Number.isFinite(percent)) {
     return '--'
   }
+
   return `${percent}%`
 }
 
@@ -51,6 +88,7 @@ async function scanWifi() {
 
   try {
     scanBusy.value = true
+
     await invoke('scan_wifi_networks')
     emit('changed')
   } finally {
@@ -94,7 +132,7 @@ watch(
         <div class="wifi-scan-dialog__list-wrap">
           <v-list density="compact" bg-color="transparent">
             <v-list-item
-                v-for="network in visibleNetworks"
+                v-for="network in sortedVisibleNetworks"
                 :key="`visible-${network.ssid}`"
                 @click="openNetwork(network)"
             >
@@ -105,6 +143,7 @@ watch(
               </template>
 
               <v-list-item-title>{{ network.ssid }}</v-list-item-title>
+
               <v-list-item-subtitle>
                 {{ signalLabel(network.signalPercent) }}
               </v-list-item-subtitle>
@@ -117,6 +156,7 @@ watch(
                 >
                   {{ t('settings.network.wifi.connected') }}
                 </v-chip>
+
                 <v-chip
                     v-else-if="network.saved"
                     variant="tonal"
@@ -126,7 +166,7 @@ watch(
               </template>
             </v-list-item>
 
-            <v-list-item v-if="!visibleNetworks.length">
+            <v-list-item v-if="!sortedVisibleNetworks.length">
               <v-list-item-title>
                 {{ t('settings.network.wifi.no_networks') }}
               </v-list-item-title>
@@ -137,6 +177,7 @@ watch(
 
       <v-card-actions>
         <v-spacer />
+
         <v-btn variant="text" @click="dialogOpen = false">
           {{ t('settings.network.close') }}
         </v-btn>

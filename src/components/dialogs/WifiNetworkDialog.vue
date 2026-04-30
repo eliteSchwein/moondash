@@ -35,6 +35,7 @@ const dialogOpen = computed({
 })
 
 const isSecured = computed(() => Boolean(props.hidden || props.network?.secured))
+const isSavedNetwork = computed(() => Boolean(props.network?.saved && !props.hidden))
 const canEditSsid = computed(() => Boolean(props.hidden))
 
 const keyboardVisible = computed(() => activeField.value !== null)
@@ -43,6 +44,14 @@ const keyboardTitle = computed(() => {
   if (activeField.value === 'ssid') return t('settings.network.wifi.ssid')
   if (activeField.value === 'password') return t('settings.network.wifi.password')
   return ''
+})
+
+const submitLabel = computed(() => {
+  if (isSavedNetwork.value && !localPassword.value.trim()) {
+    return t('settings.network.connect')
+  }
+
+  return t('settings.network.connect')
 })
 
 const keyboardModel = computed({
@@ -61,7 +70,7 @@ const keyboardModel = computed({
 })
 
 watch(
-    () => [props.modelValue, props.network, props.hidden],
+    () => [props.modelValue, props.network, props.hidden] as const,
     ([open]) => {
       if (!open) return
 
@@ -144,6 +153,8 @@ function submit() {
               density="comfortable"
               :readonly="true"
               :append-inner-icon="revealPassword ? 'mdi-eye-off' : 'mdi-eye'"
+              :hint="isSavedNetwork ? 'Leave empty to use the saved connection.' : undefined"
+              :persistent-hint="isSavedNetwork"
               @click="openPasswordKeyboard"
               @click:append-inner.stop="revealPassword = !revealPassword"
           />
@@ -152,15 +163,17 @@ function submit() {
 
       <v-card-actions>
         <v-spacer />
+
         <v-btn variant="text" @click="closeDialog">
           {{ t('settings.network.cancel') }}
         </v-btn>
+
         <v-btn
             color="primary"
             :disabled="!localSsid.trim()"
             @click="submit"
         >
-          {{ t('settings.network.connect') }}
+          {{ submitLabel }}
         </v-btn>
       </v-card-actions>
     </v-card>

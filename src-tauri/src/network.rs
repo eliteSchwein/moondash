@@ -59,7 +59,7 @@ fn quality_label(percent: u8) -> String {
         1..=39 => "weak",
         _ => "none",
     }
-    .to_string()
+        .to_string()
 }
 
 fn disconnected() -> NetworkStatus {
@@ -105,6 +105,11 @@ fn ethernet_and_wifi(ssid: String, signal_percent: Option<u8>) -> NetworkStatus 
 #[cfg(target_os = "linux")]
 async fn nm() -> Result<NetworkManager, String> {
     NetworkManager::new().await.map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn normalize_ssid(ssid: &str) -> String {
+    ssid.trim().to_string()
 }
 
 #[cfg(target_os = "linux")]
@@ -178,7 +183,8 @@ fn dedupe_nm_networks(networks: Vec<NmNetwork>) -> Vec<NmNetwork> {
     let mut by_ssid: HashMap<String, NmNetwork> = HashMap::new();
 
     for network in networks {
-        let ssid = network.ssid.trim().to_string();
+        let ssid = normalize_ssid(&network.ssid);
+
         if ssid.is_empty() {
             continue;
         }
@@ -199,21 +205,177 @@ fn dedupe_nm_networks(networks: Vec<NmNetwork>) -> Vec<NmNetwork> {
     }
 
     let mut result: Vec<NmNetwork> = by_ssid.into_values().collect();
+
     result.sort_by(|a, b| {
         b.strength
             .unwrap_or(0)
             .cmp(&a.strength.unwrap_or(0))
-            .then_with(|| a.ssid.to_lowercase().cmp(&b.ssid.to_lowercase()))
+            .then_with(|| {
+                normalize_ssid(&a.ssid)
+                    .to_lowercase()
+                    .cmp(&normalize_ssid(&b.ssid).to_lowercase())
+            })
     });
+
     result
 }
 
 #[cfg(target_os = "linux")]
+fn dedupe_saved_names(names: Vec<String>) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut result = Vec::new();
+
+    for name in names {
+        let ssid = normalize_ssid(&name);
+
+        if ssid.is_empty() {
+            continue;
+        }
+
+        if seen.insert(ssid.clone()) {
+            result.push(ssid);
+        }
+    }
+
+    result.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+    result
+}
+
+#[cfg(target_os = "linux")]
+fn unescape_nmcli_field(value: &str) -> String {
+    let mut result = String::new();
+    let mut escaped = false;
+
+    for ch in value.chars() {
+        if escaped {
+            result.push(ch);
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else {
+            result.push(ch);
+        }
+    }
+
+    if escaped {
+        result.push('\\');
+    }
+
+    result
+}
+
+#[cfg(target_os = "linux")]
+fn split_nmcli_name_type(line: &str) -> Option<(String, String)> {
+    let mut escaped = false;
+    let mut separator_index = None;
+
+    for (index, ch) in line.char_indices().rev() {
+        if ch == ':' && !escaped {
+            separator_index = Some(index);
+            break;
+        }
+
+        escaped = ch == '\\' && !escaped;
+
+        if ch != '\\' {
+            escaped = false;
+        }
+    }
+
+    let index = separator_index?;
+    let name = unescape_nmcli_field(&line[..index]);
+    let connection_type = unescape_nmcli_field(&line[index + 1..]);
+
+    Some((name, connection_type))
+}
+
+#[cfg(target_os = "linux")]
+fn nmcli_saved_wifi_connections() -> Result<Vec<String>, String> {
+    let output = Command::new("nmcli")
+        .args(["--wait", "5", "-t", "-f", "NAME,TYPE", "connection", "show"])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        if !stderr.is_empty() {
+            return Err(stderr);
+        }
+
+        if !stdout.is_empty() {
+            return Err(stdout);
+        }
+
+        return Err("nmcli connection show failed".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let names = stdout
+        .lines()
+        .filter_map(split_nmcli_name_type)
+        .filter_map(|(name, connection_type)| {
+            let connection_type = connection_type.trim();
+
+            if connection_type == "802-11-wireless" || connection_type == "wifi" {
+                Some(name)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    Ok(dedupe_saved_names(names))
+}
+
+#[cfg(target_os = "linux")]
+async fn saved_wifi_connection_names(nm: &NetworkManager) -> Result<Vec<String>, String> {
+    match nmcli_saved_wifi_connections() {
+        Ok(names) => Ok(names),
+        Err(_) => {
+            let names = nm
+                .list_saved_connections()
+                .await
+                .map_err(|e| e.to_string())?;
+
+            Ok(dedupe_saved_names(names))
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn run_nmcli_saved_connection(ssid: &str) -> Result<(), String> {
+    let output = Command::new("nmcli")
+        .args(["--wait", "20", "connection", "up", "id", ssid])
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+    if !stderr.is_empty() {
+        Err(stderr)
+    } else if !stdout.is_empty() {
+        Err(stdout)
+    } else {
+        Err(format!("failed to activate saved WiFi connection {}", ssid))
+    }
+}
+
+#[cfg(target_os = "linux")]
 fn map_visible_network(net: &NmNetwork, saved_set: &HashSet<String>) -> WifiNetwork {
+    let ssid = normalize_ssid(&net.ssid);
+
     WifiNetwork {
-        ssid: net.ssid.clone(),
+        saved: saved_set.contains(&ssid),
+        ssid,
         secured: net.secured,
-        saved: saved_set.contains(&net.ssid),
         signal_percent: net.strength,
     }
 }
@@ -231,11 +393,6 @@ fn fallback_saved_network(ssid: String) -> WifiNetwork {
 #[cfg(target_os = "linux")]
 fn sort_networks_by_name(networks: &mut [WifiNetwork]) {
     networks.sort_by(|a, b| a.ssid.to_lowercase().cmp(&b.ssid.to_lowercase()));
-}
-
-#[cfg(target_os = "linux")]
-fn wired_ipv4_for_interface(interface_name: &str) -> Option<String> {
-    ipv4_for_interface(interface_name)
 }
 
 #[cfg(target_os = "linux")]
@@ -263,6 +420,11 @@ fn run_nmcli_device_toggle(interface_name: &str, enabled: bool) -> Result<(), St
     }
 }
 
+#[cfg(target_os = "linux")]
+fn wired_ipv4_for_interface(interface_name: &str) -> Option<String> {
+    ipv4_for_interface(interface_name)
+}
+
 async fn get_network_status_inner() -> Result<NetworkStatus, String> {
     #[cfg(target_os = "linux")]
     {
@@ -273,13 +435,13 @@ async fn get_network_status_inner() -> Result<NetworkStatus, String> {
             .iter()
             .any(|device| is_wired_device(device) && is_active_device(device));
 
-        let wifi_ssid = nm.current_ssid().await;
+        let wifi_ssid = nm.current_ssid().await.map(|ssid| normalize_ssid(&ssid));
 
         if let Some(current_ssid) = wifi_ssid {
             let visible = dedupe_nm_networks(nm.list_networks().await.unwrap_or_default());
             let signal = visible
                 .iter()
-                .find(|network| network.ssid == current_ssid)
+                .find(|network| normalize_ssid(&network.ssid) == current_ssid)
                 .and_then(|network| network.strength);
 
             if ethernet_connected {
@@ -309,7 +471,7 @@ async fn get_wifi_settings_inner() -> Result<WifiSettings, String> {
         let devices = nm.list_devices().await.map_err(|e| e.to_string())?;
 
         let enabled = nm.wifi_enabled().await.map_err(|e| e.to_string())?;
-        let connected_ssid = nm.current_ssid().await;
+        let connected_ssid = nm.current_ssid().await.map(|ssid| normalize_ssid(&ssid));
 
         let connected_ip = active_wifi_interface_name(&devices)
             .as_deref()
@@ -322,10 +484,7 @@ async fn get_wifi_settings_inner() -> Result<WifiSettings, String> {
                 }
             });
 
-        let all_saved_names = nm
-            .list_saved_connections()
-            .await
-            .map_err(|e| e.to_string())?;
+        let saved_names = saved_wifi_connection_names(&nm).await?;
 
         let visible_networks = if enabled {
             dedupe_nm_networks(nm.list_networks().await.unwrap_or_default())
@@ -333,26 +492,7 @@ async fn get_wifi_settings_inner() -> Result<WifiSettings, String> {
             Vec::new()
         };
 
-        let visible_ssids: HashSet<String> = visible_networks
-            .iter()
-            .map(|network| network.ssid.clone())
-            .collect();
-
-        let mut wifi_saved_names: Vec<String> = all_saved_names
-            .into_iter()
-            .filter(|name| {
-                visible_ssids.contains(name)
-                    || connected_ssid
-                        .as_ref()
-                        .map(|ssid| ssid == name)
-                        .unwrap_or(false)
-            })
-            .collect();
-
-        wifi_saved_names.sort();
-        wifi_saved_names.dedup();
-
-        let saved_set: HashSet<String> = wifi_saved_names.iter().cloned().collect();
+        let saved_set: HashSet<String> = saved_names.iter().cloned().collect();
 
         let scanned_networks: Vec<WifiNetwork> = visible_networks
             .iter()
@@ -365,7 +505,7 @@ async fn get_wifi_settings_inner() -> Result<WifiSettings, String> {
             .map(|network| (network.ssid.clone(), network))
             .collect();
 
-        let mut saved_networks: Vec<WifiNetwork> = wifi_saved_names
+        let mut saved_networks: Vec<WifiNetwork> = saved_names
             .into_iter()
             .map(|ssid| {
                 visible_by_ssid
@@ -403,6 +543,7 @@ async fn get_wired_settings_inner() -> Result<WiredSettings, String> {
             .filter(|device| is_wired_device(device))
             .map(|device| {
                 let interface_name = device.interface.clone();
+
                 WiredInterface {
                     connected: is_active_device(&device),
                     ip: wired_ipv4_for_interface(&interface_name),
@@ -426,9 +567,16 @@ async fn set_wifi_enabled_inner(enabled: bool) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let nm = nm().await?;
+
         nm.set_wifi_enabled(enabled)
             .await
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+
+        if enabled {
+            sleep(Duration::from_millis(700)).await;
+        }
+
+        Ok(())
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -464,12 +612,9 @@ async fn scan_wifi_networks_inner() -> Result<Vec<WifiNetwork>, String> {
         }
 
         nm.scan_networks().await.map_err(|e| e.to_string())?;
-        sleep(Duration::from_millis(1200)).await;
+        sleep(Duration::from_millis(1800)).await;
 
-        let saved_names = nm
-            .list_saved_connections()
-            .await
-            .map_err(|e| e.to_string())?;
+        let saved_names = saved_wifi_connection_names(&nm).await?;
         let saved_set: HashSet<String> = saved_names.into_iter().collect();
 
         let networks = dedupe_nm_networks(
@@ -494,15 +639,30 @@ async fn connect_to_wifi_inner(ssid: String, password: Option<String>) -> Result
     #[cfg(target_os = "linux")]
     {
         let nm = nm().await?;
+        let ssid = normalize_ssid(&ssid);
 
-        let security = match password {
-            Some(psk) if !psk.trim().is_empty() => WifiSecurity::WpaPsk { psk },
-            _ => WifiSecurity::Open,
-        };
+        if ssid.is_empty() {
+            return Err("SSID cannot be empty".to_string());
+        }
 
-        nm.connect(&ssid, security)
-            .await
-            .map_err(|e| e.to_string())
+        match password {
+            Some(psk) if !psk.trim().is_empty() => {
+                nm.connect(&ssid, WifiSecurity::WpaPsk { psk })
+                    .await
+                    .map_err(|e| e.to_string())
+            }
+            _ => {
+                let saved_names = saved_wifi_connection_names(&nm).await.unwrap_or_default();
+
+                if saved_names.iter().any(|saved| saved == &ssid) {
+                    run_nmcli_saved_connection(&ssid)
+                } else {
+                    nm.connect(&ssid, WifiSecurity::Open)
+                        .await
+                        .map_err(|e| e.to_string())
+                }
+            }
+        }
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -529,6 +689,12 @@ async fn forget_saved_wifi_inner(ssid: String) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         let nm = nm().await?;
+        let ssid = normalize_ssid(&ssid);
+
+        if ssid.is_empty() {
+            return Err("SSID cannot be empty".to_string());
+        }
+
         nm.forget(&ssid).await.map_err(|e| e.to_string())
     }
 
@@ -623,7 +789,10 @@ impl NetworkWorkerState {
                         reply,
                     } => {
                         let _ = reply.send(
-                            runtime.block_on(set_wired_interface_enabled_inner(interface_name, enabled))
+                            runtime.block_on(set_wired_interface_enabled_inner(
+                                interface_name,
+                                enabled,
+                            )),
                         );
                     }
                     WorkerRequest::ScanWifiNetworks { reply } => {
@@ -641,7 +810,8 @@ impl NetworkWorkerState {
                         password,
                         reply,
                     } => {
-                        let _ = reply.send(runtime.block_on(connect_hidden_wifi_inner(ssid, password)));
+                        let _ =
+                            reply.send(runtime.block_on(connect_hidden_wifi_inner(ssid, password)));
                     }
                     WorkerRequest::ForgetSavedWifi { ssid, reply } => {
                         let _ = reply.send(runtime.block_on(forget_saved_wifi_inner(ssid)));
@@ -681,8 +851,8 @@ async fn dispatch_blocking<R: Send + 'static>(
             .recv()
             .map_err(|_| "network worker dropped response".to_string())?
     })
-    .await
-    .map_err(|e| e.to_string())?
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -715,12 +885,13 @@ pub async fn set_wired_interface_enabled(
     enabled: bool,
 ) -> Result<(), String> {
     let tx = worker().sender()?;
+
     dispatch_blocking(tx, move |reply| WorkerRequest::SetWiredInterfaceEnabled {
         interface_name,
         enabled,
         reply,
     })
-    .await
+        .await
 }
 
 #[tauri::command]
@@ -732,23 +903,25 @@ pub async fn scan_wifi_networks() -> Result<Vec<WifiNetwork>, String> {
 #[tauri::command]
 pub async fn connect_to_wifi(ssid: String, password: Option<String>) -> Result<(), String> {
     let tx = worker().sender()?;
+
     dispatch_blocking(tx, move |reply| WorkerRequest::ConnectToWifi {
         ssid,
         password,
         reply,
     })
-    .await
+        .await
 }
 
 #[tauri::command]
 pub async fn connect_hidden_wifi(ssid: String, password: Option<String>) -> Result<(), String> {
     let tx = worker().sender()?;
+
     dispatch_blocking(tx, move |reply| WorkerRequest::ConnectHiddenWifi {
         ssid,
         password,
         reply,
     })
-    .await
+        .await
 }
 
 #[tauri::command]
