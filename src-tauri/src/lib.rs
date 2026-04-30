@@ -19,6 +19,16 @@ struct WatchedConfigPath(Mutex<Option<String>>);
 struct IdleWatcherGeneration(Mutex<u64>);
 
 #[tauri::command]
+fn frontend_log(level: String, message: String) {
+    match level.as_str() {
+        "error" => eprintln!("[frontend:error] {message}"),
+        "warn" => eprintln!("[frontend:warn] {message}"),
+        "log" => println!("[frontend:log] {message}"),
+        _ => println!("[frontend:{level}] {message}"),
+    }
+}
+
+#[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
@@ -926,6 +936,7 @@ pub fn run() {
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            frontend_log,
             greet,
             get_config,
             load_config_file,
