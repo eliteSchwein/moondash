@@ -168,7 +168,7 @@ const activeConfigSuggestions = computed(() => {
           if (ledSelection.startsWith('_')) return false
 
           const parts = ledSelection.split(/\s+/)
-          const channel = parts.at(-1)?.toLowerCase() ?? ''
+          const channel = parts.length ? parts[parts.length - 1]?.toLowerCase() ?? '' : ''
 
           return ['red', 'green', 'blue', 'white'].includes(channel)
         }
