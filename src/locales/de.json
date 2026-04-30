@@ -1,4 +1,7 @@
 {
+  "lock": {
+    "locked": "Derzeit gesperrt, bitte warten Sie auf die Entsperrung"
+  },
   "tune": {
     "flow": "Fluss",
     "pa": "Druckvorschub (PA)",

@@ -1,4 +1,7 @@
 {
+  "lock": {
+    "locked": "currently locked, please wait for unlock"
+  },
   "tune": {
     "flow": "Flow",
     "pa": "Pressure Advance",
