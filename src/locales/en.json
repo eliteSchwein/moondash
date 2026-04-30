@@ -225,7 +225,6 @@
       },
       "webcam": {
         "title": "Webcam",
-        "no_webcam": "No Webcam Found",
         "refresh": "Refresh",
         "reload_webcams": "Reload Webcams"
       }

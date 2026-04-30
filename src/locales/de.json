@@ -225,7 +225,6 @@
       },
       "webcam": {
         "title": "Webcam",
-        "no_webcam": "Keine Webcam gefunden",
         "refresh": "Aktualisieren",
         "reload_webcams": "Webcams neu laden"
       }

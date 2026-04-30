@@ -205,10 +205,6 @@ onMounted(() => {
           <v-alert v-else-if="loading" type="info" variant="tonal">
             Loading webcam…
           </v-alert>
-
-          <v-alert v-else type="info" variant="tonal">
-            {{ t('settings.tools.noWebcam') }}
-          </v-alert>
         </div>
 
         <div class="tool-webcam__controls">
