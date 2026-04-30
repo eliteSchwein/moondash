@@ -206,9 +206,11 @@ onMounted(async () => {
             <v-list-item
                 v-for="iface in wiredInterfaces"
                 :key="iface.interfaceName"
+                prependGap="1em"
+                class="px-0"
             >
               <template #prepend>
-                <v-icon :color="iface.connected ? 'success' : undefined">
+                <v-icon :color="iface.connected ? 'success' : undefined" style="font-size: 2.25em">
                   mdi-ethernet
                 </v-icon>
               </template>
