@@ -136,10 +136,6 @@ fn open_input_devices() -> Result<Vec<Device>, String> {
 fn should_watch_device(device: &Device) -> bool {
     let name = device.name().unwrap_or("").to_lowercase();
 
-    if name.contains("hdmi") || name.contains("vc4-hdmi") {
-        return false;
-    }
-
     if let Some(keys) = device.supported_keys() {
         if keys.iter().next().is_some() {
             return true;
