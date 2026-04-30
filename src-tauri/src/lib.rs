@@ -667,7 +667,7 @@ fn default_config() -> Value {
         "system": {
             "language": "en",
             "idle_timeout": 900,
-            "idle_unlock": 250,
+            "idle_unlock": 500,
             "use_idle_timeout": true
         }
     })
