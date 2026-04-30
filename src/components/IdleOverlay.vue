@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useAppStore } from '../stores/app'
 
@@ -14,6 +14,13 @@ let unlisten: UnlistenFn | null = null
 function isTauriRuntime(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
+
+watch(
+    () => appStore.isSleeping,
+    (isSleeping) => {
+      console.log(`Idle overlay ${isSleeping ? 'enabled' : 'disabled'}`)
+    }
+)
 
 onMounted(async () => {
   if (!isTauriRuntime()) return
@@ -32,17 +39,5 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="idle-overlay" v-if="appStore.isSleeping"/>
+  <div class="idle-overlay" v-if="appStore.isSleeping" />
 </template>
-
-<style scoped>
-.idle-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 1);
-  z-index: 9999;
-}
-</style>
