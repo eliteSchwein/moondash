@@ -23,6 +23,8 @@ const { moonraker } = storeToRefs(appStore)
 
 const selectedAfcUnit = ref<string | null>(null)
 
+const afcEnabled = computed(() => moonraker.value.afc.available)
+
 function displayAfterFirstSpace(value: string): string {
   const parts = value.split(' ')
   return parts.length > 1 ? parts.slice(1).join(' ') : value
@@ -122,7 +124,7 @@ watch(selectedAfcUnit, (value) => {
     <v-app-bar elevation="0" color="transparent" density="compact">
       <v-tabs v-model="tab" color="primary">
         <v-tab value="controls">{{ t('tune.tab.controls') }}</v-tab>
-        <v-tab value="filament">{{ t('tune.tab.filament') }}</v-tab>
+        <v-tab value="filament" v-if="afcEnabled">{{ t('tune.tab.filament') }}</v-tab>
         <v-tab value="printoptions">{{ t('tune.tab.printoptions') }}</v-tab>
       </v-tabs>
     </v-app-bar>
