@@ -249,6 +249,7 @@ onMounted(async () => {
     <WifiSavedDialog
         v-model="wifiSavedDialogOpen"
         :saved-networks="savedNetworks"
+        :connected-ssid="wifiSettings?.connectedSsid ?? null"
         @changed="handleNetworksChanged"
     />
 
