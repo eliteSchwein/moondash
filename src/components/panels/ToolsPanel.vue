@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 import BedMeshToolPanel from '@/components/panels/BedMeshToolPanel.vue'
 import PidToolPanel from '@/components/panels/PidToolPanel.vue'
 import WebcamToolPanel from '@/components/panels/WebcamToolPanel.vue'
@@ -8,27 +9,111 @@ import WebcamToolPanel from '@/components/panels/WebcamToolPanel.vue'
 type ToolView = 'home' | 'bed-mesh' | 'pid' | 'webcam'
 
 const { t } = useI18n()
+const appStore = useAppStore()
 const currentView = ref<ToolView>('home')
+const webcamCount = ref(0)
 
-const toolItems = [
-  {
-    view: 'bed-mesh' as const,
-    title: 'settings.tools.bed_mesh.title',
-    icon: 'mdi-grid',
-  },
+let webcamRefreshTimer: ReturnType<typeof window.setInterval> | null = null
+
+const hasBedMesh = computed(() => {
+  const configfile = appStore.moonraker.rawObjects.configfile as
+      | { config?: Record<string, unknown> }
+      | undefined
+
+  return 'bed_mesh' in (configfile?.config ?? {})
+})
+
+const hasWebcam = computed(() => webcamCount.value > 0)
+
+const toolItems = computed(() => [
+  ...(hasBedMesh.value
+      ? [
+        {
+          view: 'bed-mesh' as const,
+          title: 'settings.tools.bed_mesh.title',
+          icon: 'mdi-grid',
+        },
+      ]
+      : []),
   {
     view: 'pid' as const,
     title: 'settings.tools.pid.title',
     icon: 'mdi-tune-variant',
   },
-  {
-    view: 'webcam' as const,
-    title: 'settings.tools.webcam.title',
-    icon: 'mdi-webcam',
-  },
-]
+  ...(hasWebcam.value
+      ? [
+        {
+          view: 'webcam' as const,
+          title: 'settings.tools.webcam.title',
+          icon: 'mdi-webcam',
+        },
+      ]
+      : []),
+])
+
+async function loadWebcams() {
+  if (!appStore.websocket.ip || !appStore.websocket.connected) {
+    webcamCount.value = 0
+    return
+  }
+
+  try {
+    const response = await fetch(`http://${appStore.websocket.ip}/server/webcams/list`)
+    const data = await response.json()
+    const webcams = data?.result?.webcams ?? data?.webcams ?? []
+
+    webcamCount.value = Array.isArray(webcams) ? webcams.length : 0
+  } catch {
+    webcamCount.value = 0
+  }
+}
+
+function startWebcamRefresh() {
+  stopWebcamRefresh()
+  loadWebcams()
+
+  webcamRefreshTimer = window.setInterval(() => {
+    loadWebcams()
+  }, 5000)
+}
+
+function stopWebcamRefresh() {
+  if (webcamRefreshTimer) {
+    window.clearInterval(webcamRefreshTimer)
+    webcamRefreshTimer = null
+  }
+}
+
+watch(
+    () => [appStore.websocket.ip, appStore.websocket.connected],
+    () => {
+      startWebcamRefresh()
+    },
+    { immediate: true },
+)
+
+watch([hasBedMesh, hasWebcam], () => {
+  if (!hasBedMesh.value && currentView.value === 'bed-mesh') {
+    currentView.value = 'home'
+  }
+
+  if (!hasWebcam.value && currentView.value === 'webcam') {
+    currentView.value = 'home'
+  }
+})
+
+onMounted(() => {
+  startWebcamRefresh()
+})
+
+onUnmounted(() => {
+  stopWebcamRefresh()
+})
 
 function openTool(view: ToolView) {
+  if (view === 'bed-mesh' && !hasBedMesh.value) return
+  if (view === 'webcam' && !hasWebcam.value) return
+
   currentView.value = view
 }
 
@@ -64,23 +149,37 @@ function goHome() {
 
       <div v-else class="tools-subpanel">
         <div class="tools-subpanel__header">
-          <v-btn icon="mdi-arrow-left" variant="text" @click="goHome" />
-          <div class="tools-subpanel__title">
-            <template v-if="currentView === 'bed-mesh'">
-              {{ t('settings.tools.bed_mesh.title') }}
-            </template>
-            <template v-else-if="currentView === 'pid'">
-              {{ t('settings.tools.pid.title') }}
-            </template>
-            <template v-else-if="currentView === 'webcam'">
-              {{ t('settings.tools.webcam.title') }}
-            </template>
-          </div>
+          <v-btn  variant="text" @click="goHome">
+            <v-icon icon="mdi-arrow-left" />
+
+            <div class="tools-subpanel__title pl-4 pr-2">
+              <template v-if="currentView === 'bed-mesh'">
+                {{ t('settings.tools.bed_mesh.title') }}
+              </template>
+              <template v-else-if="currentView === 'pid'">
+                {{ t('settings.tools.pid.title') }}
+              </template>
+              <template v-else-if="currentView === 'webcam'">
+                {{ t('settings.tools.webcam.title') }}
+              </template>
+            </div>
+          </v-btn>
         </div>
 
-        <BedMeshToolPanel v-if="currentView === 'bed-mesh'" @back="goHome" />
-        <PidToolPanel v-else-if="currentView === 'pid'" @back="goHome" />
-        <WebcamToolPanel v-else-if="currentView === 'webcam'" @back="goHome" />
+        <BedMeshToolPanel
+            v-if="currentView === 'bed-mesh' && hasBedMesh"
+            @back="goHome"
+        />
+
+        <PidToolPanel
+            v-else-if="currentView === 'pid'"
+            @back="goHome"
+        />
+
+        <WebcamToolPanel
+            v-else-if="currentView === 'webcam' && hasWebcam"
+            @back="goHome"
+        />
       </div>
     </v-card-text>
   </v-card>
@@ -100,7 +199,7 @@ function goHome() {
 
 .tools-home,
 .tools-subpanel {
-  padding: 0px;
+  padding: 0;
 }
 
 .tools-list {
