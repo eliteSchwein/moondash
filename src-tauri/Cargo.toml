@@ -1,6 +1,6 @@
 [package]
 name = "moondash"
-version = "0.0.3"
+version = "0.0.4"
 description = "Modern Klipper Touch Interface"
 authors = ["tludwigdev"]
 edition = "2021"
