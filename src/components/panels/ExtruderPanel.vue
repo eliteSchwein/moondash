@@ -89,7 +89,10 @@ function getSensorButtonClass(sensor: SensorItem): Record<string, boolean> {
   }
 }
 
-async function runGcode(action: string, script: string) {
+async function runGcode(
+    action: string,
+    script: string,
+    timeoutMs: number | null = 10000,) {
   if (runningAction.value) return false
 
   try {
@@ -97,6 +100,7 @@ async function runGcode(action: string, script: string) {
 
     await moonrakerClient.call('printer.gcode.script', {
       script,
+      timeoutMs
     })
 
     return true
@@ -109,11 +113,11 @@ async function runGcode(action: string, script: string) {
 }
 
 async function loadFilament() {
-  await runGcode('load-filament', 'LOAD_FILAMENT')
+  await runGcode('load-filament', 'LOAD_FILAMENT', 60_000)
 }
 
 async function unloadFilament() {
-  await runGcode('unload-filament', 'UNLOAD_FILAMENT')
+  await runGcode('unload-filament', 'UNLOAD_FILAMENT', 60_000)
 }
 
 function getSensorCommandName(key: string): string {
