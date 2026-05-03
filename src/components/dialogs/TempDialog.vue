@@ -31,19 +31,20 @@ const dialogOpen = computed({
 })
 
 const displayValue = computed(() => {
-  return localValue.value || '0'
+  if (localValue.value !== '') return localValue.value
+
+  if (typeof props.currentTarget === 'number' && Number.isFinite(props.currentTarget)) {
+    return String(Math.max(0, Math.round(props.currentTarget)))
+  }
+
+  return '0'
 })
 
 watch(
     () => props.modelValue,
     (open) => {
       if (!open) return
-
-      if (typeof props.currentTarget === 'number' && Number.isFinite(props.currentTarget)) {
-        localValue.value = String(Math.max(0, Math.round(props.currentTarget)))
-      } else {
-        localValue.value = ''
-      }
+      localValue.value = ''
     },
     { immediate: true },
 )
@@ -81,17 +82,30 @@ function clampTarget(value: number): number {
   return Math.max(0, Math.min(props.maxTemp, Math.round(value)))
 }
 
+function getSetTemperatureScript(target: number): string {
+  if (props.heater.startsWith('temperature_fan ')) {
+    const fanName = props.heater.replace(/^temperature_fan\s+/, '')
+    return `SET_TEMPERATURE_FAN_TARGET TEMPERATURE_FAN=${fanName} TARGET=${target}`
+  }
+
+  return `SET_HEATER_TEMPERATURE HEATER=${props.heater} TARGET=${target}`
+}
+
 async function saveTemp() {
   if (saving.value) return
 
-  const parsed = Number(localValue.value || '0')
-  const target = clampTarget(Number.isFinite(parsed) ? parsed : 0)
+  const fallbackTarget =
+      typeof props.currentTarget === 'number' && Number.isFinite(props.currentTarget)
+          ? props.currentTarget
+          : 0
+  const parsed = Number(localValue.value === '' ? fallbackTarget : localValue.value)
+  const target = clampTarget(Number.isFinite(parsed) ? parsed : fallbackTarget)
 
   try {
     saving.value = true
 
     await moonrakerClient.call('printer.gcode.script', {
-      script: `SET_HEATER_TEMPERATURE HEATER=${props.heater} TARGET=${target}`,
+      script: getSetTemperatureScript(target),
     })
 
     emit('update:modelValue', false)
