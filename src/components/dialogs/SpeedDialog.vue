@@ -213,7 +213,7 @@ async function saveDialog() {
 
 .speed-dialog-inline-row {
   display: grid;
-  grid-template-columns: repeat(3, 70px) minmax(120px, 1fr) repeat(3, 70px);
+  grid-template-columns: repeat(3, 70px) minmax(80px, 1fr) repeat(3, 70px);
   align-items: stretch;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;

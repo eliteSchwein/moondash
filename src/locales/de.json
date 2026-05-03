@@ -166,7 +166,8 @@
       "network": "Netzwerk",
       "settings": "Einstellungen",
       "tools": "Werkzeuge",
-      "shortcuts": "Kurzbefehle"
+      "shortcuts": "Kurzbefehle",
+      "updates": "Updates"
     },
     "config": {
       "colors": "Farben",
@@ -229,6 +230,20 @@
         "title": "Webcam",
         "refresh": "Aktualisieren",
         "reload_webcams": "Webcams neu laden"
+      }
+    },
+    "updates": {
+      "title": "Updates",
+      "open": "Einstellungen öffnen",
+      "updates": "{count} Updates verfügbar",
+      "package_count": "{count} Pakete",
+      "no_updates_aviable": "Keine Updates verfügbar",
+      "up_to_date": "Aktuell",
+      "update_all": "Alles Updaten",
+      "update": "Updaten",
+      "dirty": "Dreckig",
+      "dialog": {
+        "close": "Schließen"
       }
     }
   }

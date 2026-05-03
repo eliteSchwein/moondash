@@ -1,10 +1,54 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
-const tab = ref('network')
+const route = useRoute()
+const router = useRouter()
 const { t } = useI18n()
+const validTabs = new Set(['network', 'settings', 'tools', 'shortcuts', 'updates'])
+const tab = ref(getInitialTab())
 
+function getInitialTab(): string {
+  const queryTab = typeof route.query.tab === 'string' ? route.query.tab : ''
+  if (validTabs.has(queryTab)) return queryTab
+
+  if (typeof window !== 'undefined') {
+    const storedTab = window.sessionStorage.getItem('settings.tab') ?? ''
+    window.sessionStorage.removeItem('settings.tab')
+    if (validTabs.has(storedTab)) return storedTab
+  }
+
+  return 'network'
+}
+
+function openTab(value: unknown) {
+  if (typeof value !== 'string' || !validTabs.has(value)) return
+  tab.value = value
+}
+
+function handleOpenSettingsTab(event: Event) {
+  const detail = (event as CustomEvent<{ tab?: string }>).detail
+  openTab(detail?.tab)
+}
+
+watch(
+    () => route.query.tab,
+    (value) => openTab(value),
+)
+
+watch(tab, async (value) => {
+  if (route.query.tab === value) return
+  await router.replace({ query: { ...route.query, tab: value } })
+})
+
+onMounted(() => {
+  window.addEventListener('settings:open-tab', handleOpenSettingsTab)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('settings:open-tab', handleOpenSettingsTab)
+})
 
 </script>
 
@@ -16,6 +60,7 @@ const { t } = useI18n()
         <v-tab value="settings">{{ t('settings.tab.settings') }}</v-tab>
         <v-tab value="tools">{{ t('settings.tab.tools') }}</v-tab>
         <v-tab value="shortcuts">{{ t('settings.tab.shortcuts') }}</v-tab>
+        <v-tab value="updates">{{ t('settings.tab.updates') }}</v-tab>
       </v-tabs>
     </v-app-bar>
 
@@ -38,6 +83,11 @@ const { t } = useI18n()
       <v-tabs-window-item value="shortcuts">
         <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="transparent">
           <ShortcutButtonsPanel/>
+        </v-sheet>
+      </v-tabs-window-item>
+      <v-tabs-window-item value="updates">
+        <v-sheet class="pa-0 pr-3 pb-3 pt-2" color="transparent">
+          <UpdatePanel/>
         </v-sheet>
       </v-tabs-window-item>
 

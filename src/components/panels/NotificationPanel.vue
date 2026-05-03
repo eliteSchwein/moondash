@@ -1,16 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { moonraker as moonrakerClient } from '@/plugins/moonraker'
 import AfcAlert from '@/components/notifications/AfcAlert.vue'
 import KlipperAlert from '@/components/notifications/KlipperAlert.vue'
 import MoonrakerAlert from '@/components/notifications/MoonrakerAlert.vue'
+import UpdateAlert from '@/components/notifications/UpdateAlert.vue'
 
 const { t } = useI18n()
 
 const appStore = useAppStore()
 const { moonraker, websocket, moonrakerReady } = storeToRefs(appStore)
+
+type UpdateStatusResponse = {
+  version_info?: Record<string, MoonrakerUpdateService>
+}
+
+type MoonrakerUpdateService = {
+  configured_type?: string
+  version?: string
+  remote_version?: string
+  current_hash?: string
+  remote_hash?: string
+  commits_behind_count?: number
+  package_count?: number
+  is_dirty?: boolean
+  dirty?: boolean
+  full_version_string?: string
+}
+
+const updateVersionInfo = ref<Record<string, MoonrakerUpdateService>>({})
 
 function isBenignKlipperMessage(message: string): boolean {
   const normalized = message.trim().toLowerCase()
@@ -20,6 +41,56 @@ function isBenignKlipperMessage(message: string): boolean {
     'printer is ready',
     'ready',
   ].includes(normalized)
+}
+
+
+function isDirtyUpdateService(service: MoonrakerUpdateService): boolean {
+  if (service.is_dirty || service.dirty) return true
+
+  const values = [
+    service.version,
+    service.remote_version,
+    service.full_version_string,
+  ]
+
+  return values.some((value) => typeof value === 'string' && value.toLowerCase().includes('dirty'))
+}
+
+function hasServiceUpdate(service: MoonrakerUpdateService): boolean {
+  if (isDirtyUpdateService(service)) return false
+
+  if (service.configured_type === 'system') {
+    return Number(service.package_count ?? 0) > 0
+  }
+
+  if (typeof service.commits_behind_count === 'number' && service.commits_behind_count > 0) {
+    return true
+  }
+
+  if (service.current_hash && service.remote_hash && service.current_hash !== service.remote_hash) {
+    return true
+  }
+
+  if (service.version && service.remote_version && service.version !== service.remote_version) {
+    return true
+  }
+
+  return false
+}
+
+async function loadUpdateStatus() {
+  if (!moonrakerReady.value) {
+    updateVersionInfo.value = {}
+    return
+  }
+
+  try {
+    const result = await moonrakerClient.call<UpdateStatusResponse>('machine.update.status')
+    updateVersionInfo.value = result.version_info ?? {}
+  } catch (error) {
+    console.error('Failed to load notification update status', error)
+    updateVersionInfo.value = {}
+  }
 }
 
 function findMessageDeep(value: unknown): string {
@@ -130,11 +201,22 @@ const klipperMessage = computed(() => {
   return ''
 })
 
+const updateCount = computed(() => {
+  return Object.values(updateVersionInfo.value).filter((service) => hasServiceUpdate(service)).length
+})
+
+const hasUpdates = computed(() => updateCount.value > 0)
+
 const hasAlerts = computed(() => {
   return showMoonrakerAlert.value ||
       showKlipperAlert.value ||
-      Boolean(afcMessage.value)
+      Boolean(afcMessage.value) ||
+      hasUpdates.value
 })
+
+watch(moonrakerReady, loadUpdateStatus, { immediate: true })
+
+onMounted(loadUpdateStatus)
 </script>
 
 <template>
@@ -162,6 +244,11 @@ const hasAlerts = computed(() => {
         <AfcAlert
             v-if="afcMessage"
             :message="afcMessage"
+        />
+
+        <UpdateAlert
+            v-if="hasUpdates"
+            :update-count="updateCount"
         />
       </v-card-text>
     </v-card>
