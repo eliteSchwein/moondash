@@ -3,6 +3,8 @@ use nmrs::{Device, Network as NmNetwork, NetworkManager, WifiSecurity};
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::net::UdpSocket;
+use std::fs;
+use std::path::Path;
 use std::process::Command;
 use std::sync::{mpsc, Mutex, OnceLock};
 use std::thread;
@@ -49,6 +51,24 @@ pub struct WiredInterface {
 #[serde(rename_all = "camelCase")]
 pub struct WiredSettings {
     interfaces: Vec<WiredInterface>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanbusInterface {
+    interface_name: String,
+    connected: bool,
+    bitrate: Option<u64>,
+    rx_bytes: Option<u64>,
+    tx_bytes: Option<u64>,
+    rx_packets: Option<u64>,
+    tx_packets: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanbusSettings {
+    interfaces: Vec<CanbusInterface>,
 }
 
 fn quality_label(percent: u8) -> String {
@@ -425,6 +445,35 @@ fn wired_ipv4_for_interface(interface_name: &str) -> Option<String> {
     ipv4_for_interface(interface_name)
 }
 
+#[cfg(target_os = "linux")]
+fn read_u64_file(path: impl AsRef<Path>) -> Option<u64> {
+    fs::read_to_string(path).ok()?.trim().parse::<u64>().ok()
+}
+
+#[cfg(target_os = "linux")]
+fn read_operstate(interface_name: &str) -> String {
+    fs::read_to_string(format!("/sys/class/net/{}/operstate", interface_name))
+        .unwrap_or_default()
+        .trim()
+        .to_lowercase()
+}
+
+#[cfg(target_os = "linux")]
+fn canbus_interface_from_name(interface_name: String) -> CanbusInterface {
+    let base = format!("/sys/class/net/{}", interface_name);
+    let state = read_operstate(&interface_name);
+
+    CanbusInterface {
+        connected: state == "up" || state == "unknown",
+        bitrate: read_u64_file(format!("{}/can_bittiming/bitrate", base)),
+        rx_bytes: read_u64_file(format!("{}/statistics/rx_bytes", base)),
+        tx_bytes: read_u64_file(format!("{}/statistics/tx_bytes", base)),
+        rx_packets: read_u64_file(format!("{}/statistics/rx_packets", base)),
+        tx_packets: read_u64_file(format!("{}/statistics/tx_packets", base)),
+        interface_name,
+    }
+}
+
 async fn get_network_status_inner() -> Result<NetworkStatus, String> {
     #[cfg(target_os = "linux")]
     {
@@ -555,6 +604,31 @@ async fn get_wired_settings_inner() -> Result<WiredSettings, String> {
         interfaces.sort_by(|a, b| a.interface_name.cmp(&b.interface_name));
 
         Ok(WiredSettings { interfaces })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        Err("Unsupported platform".to_string())
+    }
+}
+
+async fn get_canbus_settings_inner() -> Result<CanbusSettings, String> {
+    #[cfg(target_os = "linux")]
+    {
+        let mut interfaces = Vec::new();
+
+        for entry in fs::read_dir("/sys/class/net").map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let interface_name = entry.file_name().to_string_lossy().to_string();
+
+            if interface_name.starts_with("can") {
+                interfaces.push(canbus_interface_from_name(interface_name));
+            }
+        }
+
+        interfaces.sort_by(|a, b| a.interface_name.cmp(&b.interface_name));
+
+        Ok(CanbusSettings { interfaces })
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -727,6 +801,9 @@ enum WorkerRequest {
     GetWiredSettings {
         reply: mpsc::Sender<Result<WiredSettings, String>>,
     },
+    GetCanbusSettings {
+        reply: mpsc::Sender<Result<CanbusSettings, String>>,
+    },
     SetWifiEnabled {
         enabled: bool,
         reply: mpsc::Sender<Result<(), String>>,
@@ -779,6 +856,9 @@ impl NetworkWorkerState {
                     }
                     WorkerRequest::GetWiredSettings { reply } => {
                         let _ = reply.send(runtime.block_on(get_wired_settings_inner()));
+                    }
+                    WorkerRequest::GetCanbusSettings { reply } => {
+                        let _ = reply.send(runtime.block_on(get_canbus_settings_inner()));
                     }
                     WorkerRequest::SetWifiEnabled { enabled, reply } => {
                         let _ = reply.send(runtime.block_on(set_wifi_enabled_inner(enabled)));
@@ -871,6 +951,12 @@ pub async fn get_wifi_settings() -> Result<WifiSettings, String> {
 pub async fn get_wired_settings() -> Result<WiredSettings, String> {
     let tx = worker().sender()?;
     dispatch_blocking(tx, |reply| WorkerRequest::GetWiredSettings { reply }).await
+}
+
+#[tauri::command]
+pub async fn get_canbus_settings() -> Result<CanbusSettings, String> {
+    let tx = worker().sender()?;
+    dispatch_blocking(tx, |reply| WorkerRequest::GetCanbusSettings { reply }).await
 }
 
 #[tauri::command]

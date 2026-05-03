@@ -241,6 +241,7 @@ pub fn run() {
             network::get_network_status,
             network::get_wifi_settings,
             network::get_wired_settings,
+            network::get_canbus_settings,
             network::set_wifi_enabled,
             network::set_wired_interface_enabled,
             network::scan_wifi_networks,

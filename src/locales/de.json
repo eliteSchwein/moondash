@@ -160,6 +160,9 @@
       "wired": {
         "title": "Kabelgebunden",
         "no_interfaces": "Keine kabelgebundenen Schnittstellen"
+      },
+      "canbus": {
+        "title": "CAN bus"
       }
     },
     "tab": {

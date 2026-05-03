@@ -160,6 +160,9 @@
       "wired": {
         "title": "Wired",
         "no_interfaces": "No wired interfaces"
+      },
+      "canbus": {
+        "title": "CAN bus"
       }
     },
     "tab": {

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from 'vue-i18n'
+import { useAppStore } from '@/stores/app'
 import WifiNetworkDialog from '@/components/dialogs/WifiNetworkDialog.vue'
 import WifiSavedDialog from '@/components/dialogs/WifiSavedDialog.vue'
 import WifiScanDialog from '@/components/dialogs/WifiScanDialog.vue'
@@ -31,7 +33,24 @@ type WiredSettings = {
   interfaces: WiredInterface[]
 }
 
+type CanbusInterface = {
+  interfaceName: string
+  connected: boolean
+  bitrate?: number | null
+  rxBytes?: number | null
+  txBytes?: number | null
+  rxPackets?: number | null
+  txPackets?: number | null
+  bandwidth?: number | null
+}
+
+type CanbusSettings = {
+  interfaces: CanbusInterface[]
+}
+
 const { t } = useI18n()
+const appStore = useAppStore()
+const { moonraker } = storeToRefs(appStore)
 
 const loading = ref(false)
 const wifiBusy = ref(false)
@@ -39,6 +58,7 @@ const wiredBusy = ref<string | null>(null)
 
 const wifiSettings = ref<WifiSettings | null>(null)
 const wiredSettings = ref<WiredSettings | null>(null)
+const canbusSettings = ref<CanbusSettings | null>(null)
 
 const wifiDialogOpen = ref(false)
 const wifiSavedDialogOpen = ref(false)
@@ -51,6 +71,33 @@ const savedNetworks = computed(() => wifiSettings.value?.savedNetworks ?? [])
 const visibleNetworks = computed(() => wifiSettings.value?.scannedNetworks ?? [])
 const wiredInterfaces = computed(() => wiredSettings.value?.interfaces ?? [])
 
+const canbusInterfacesFromMoonraker = computed<CanbusInterface[]>(() => {
+  const network = moonraker.value.procStats.network ?? {}
+
+  return Object.entries(network)
+      .filter(([name]) => name.startsWith('can'))
+      .map(([name, stats]) => {
+        const record = stats && typeof stats === 'object' ? stats as Record<string, unknown> : {}
+
+        return {
+          interfaceName: name,
+          connected: Number(record.bandwidth ?? 0) > 0 || Number(record.rx_packets ?? 0) > 0 || Number(record.tx_packets ?? 0) > 0,
+          rxBytes: toNullableNumber(record.rx_bytes),
+          txBytes: toNullableNumber(record.tx_bytes),
+          rxPackets: toNullableNumber(record.rx_packets),
+          txPackets: toNullableNumber(record.tx_packets),
+          bandwidth: toNullableNumber(record.bandwidth),
+        }
+      })
+      .sort((a, b) => a.interfaceName.localeCompare(b.interfaceName))
+})
+
+const canbusInterfaces = computed(() => canbusSettings.value?.interfaces ?? canbusInterfacesFromMoonraker.value)
+
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
 async function loadWifiSettings() {
   wifiSettings.value = await invoke<WifiSettings>('get_wifi_settings')
 }
@@ -59,12 +106,21 @@ async function loadWiredSettings() {
   wiredSettings.value = await invoke<WiredSettings>('get_wired_settings')
 }
 
+async function loadCanbusSettings() {
+  try {
+    canbusSettings.value = await invoke<CanbusSettings>('get_canbus_settings')
+  } catch {
+    canbusSettings.value = null
+  }
+}
+
 async function refreshAll() {
   try {
     loading.value = true
     await Promise.all([
       loadWifiSettings(),
       loadWiredSettings(),
+      loadCanbusSettings(),
     ])
   } finally {
     loading.value = false
@@ -125,6 +181,25 @@ async function handleWifiDialogSubmit(payload: { ssid: string; password: string 
 
 async function handleNetworksChanged() {
   await loadWifiSettings()
+}
+
+function formatCanbusSubtitle(iface: CanbusInterface): string {
+  const parts: string[] = []
+
+  if (iface.bitrate) {
+    parts.push(`${Math.round(iface.bitrate / 1000)} kbit/s`)
+  }
+
+  if (iface.bandwidth !== null && iface.bandwidth !== undefined) {
+    parts.push(`${iface.bandwidth} B/s`)
+  }
+
+  const packets: string[] = []
+  if (iface.rxPackets !== null && iface.rxPackets !== undefined) packets.push(`RX ${iface.rxPackets}`)
+  if (iface.txPackets !== null && iface.txPackets !== undefined) packets.push(`TX ${iface.txPackets}`)
+  if (packets.length) parts.push(packets.join(' / '))
+
+  return parts.length ? parts.join(' · ') : '--'
 }
 
 onMounted(async () => {
@@ -239,6 +314,34 @@ onMounted(async () => {
           </v-list>
         </v-card-text>
       </v-card>
+
+      <v-card class="network-panel__canbus-card" rounded="lg" variant="flat" v-if="canbusInterfaces.length">
+        <v-card-title>
+          {{ t('settings.network.canbus.title') }}
+        </v-card-title>
+
+        <v-card-text class="network-panel__card-content">
+          <v-list density="compact" bg-color="transparent">
+            <v-list-item
+                v-for="iface in canbusInterfaces"
+                :key="iface.interfaceName"
+                prependGap="1em"
+                class="px-0"
+            >
+              <template #prepend>
+                <v-icon :color="iface.connected ? 'success' : undefined" style="font-size: 2.25em">
+                  mdi-expansion-card
+                </v-icon>
+              </template>
+
+              <v-list-item-title>{{ iface.interfaceName }}</v-list-item-title>
+              <v-list-item-subtitle>
+                {{ formatCanbusSubtitle(iface) }}
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+      </v-card>
     </div>
 
     <WifiNetworkDialog
@@ -276,7 +379,7 @@ onMounted(async () => {
 
 .network-panel__grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -318,5 +421,9 @@ onMounted(async () => {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.network-panel__canbus-card {
+  grid-column: 2;
 }
 </style>
