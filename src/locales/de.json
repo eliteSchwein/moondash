@@ -64,6 +64,8 @@
     }
   },
   "print_files": {
+    "filter": "Filter",
+    "filter_description": "Filter Druckdateien nach Namen",
     "none_found": "Keine Druckdateien gefunden",
     "unknown_file": "Unbekannte Datei"
   },

@@ -5,12 +5,16 @@ import { useI18n } from 'vue-i18n'
 import { moonraker as moonrakerClient } from '@/plugins/moonraker'
 import { useAppStore } from '@/stores/app'
 import PrintDialog from '@/components/dialogs/PrintDialog.vue'
+import KeyboardOverlay from '@/components/KeyboardOverlay.vue'
+import PrintFilePreview from '@/components/PrintFilePreview.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const { moonraker, moonrakerReady } = storeToRefs(appStore)
 
 const FILES_PER_REQUEST = 12
+
+type SortMode = 'modified-desc' | 'modified-asc' | 'name-asc' | 'name-desc'
 
 type MoonrakerFile = {
   path?: string
@@ -37,8 +41,29 @@ type MoonrakerGcodeMetadata = {
   }
 }
 
+type FolderEntry = {
+  type: 'folder'
+  path: string
+  name: string
+  modified: number
+}
+
+type FileEntry = {
+  type: 'file'
+  file: MoonrakerFile
+  path: string
+  name: string
+  modified: number
+}
+
+type BrowserEntry = FolderEntry | FileEntry
+
 const allFiles = ref<MoonrakerFile[]>([])
+const currentFolder = ref('')
 const currentPage = ref(0)
+const sortMode = ref<SortMode>('modified-desc')
+const nameFilter = ref('')
+const keyboardOpen = ref(false)
 
 const loadingFiles = ref(false)
 const loadingPage = ref(false)
@@ -48,7 +73,6 @@ const fileMetadata = ref<Record<string, MoonrakerGcodeMetadata>>({})
 
 const printDialogOpen = ref(false)
 const selectedFile = ref<MoonrakerFile | null>(null)
-const selectedFileThumbnails = ref<MoonrakerThumbnail[]>([])
 const selectedFileMetadata = ref<MoonrakerGcodeMetadata | null>(null)
 
 const printerIsReadyForSelection = computed(() => {
@@ -87,52 +111,108 @@ const moonrakerHttpBase = computed(() => {
   }
 })
 
-const sortedFiles = computed(() => {
-  return [...allFiles.value].sort((a, b) => {
-    const aModified = typeof a.modified === 'number' ? a.modified : 0
-    const bModified = typeof b.modified === 'number' ? b.modified : 0
-    return bModified - aModified
-  })
+const breadcrumbs = computed(() => {
+  if (!currentFolder.value) return []
+
+  const parts = currentFolder.value.split('/').filter(Boolean)
+  return parts.map((part, index) => ({
+    name: part,
+    path: parts.slice(0, index + 1).join('/'),
+  }))
 })
 
-const pageFiles = computed(() => {
+const browserEntries = computed<BrowserEntry[]>(() => {
+  const folderMap = new Map<string, FolderEntry>()
+  const files: FileEntry[] = []
+  const folderPrefix = currentFolder.value ? `${currentFolder.value}/` : ''
+  const normalizedFilter = nameFilter.value.trim().toLowerCase()
+
+  for (const file of allFiles.value) {
+    const path = getFilePath(file)
+    if (!path) continue
+    if (currentFolder.value && path !== currentFolder.value && !path.startsWith(folderPrefix)) continue
+
+    const relativePath = currentFolder.value ? path.slice(folderPrefix.length) : path
+    if (!relativePath || relativePath === path && currentFolder.value && !path.startsWith(folderPrefix)) continue
+
+    const [firstSegment, ...rest] = relativePath.split('/').filter(Boolean)
+    if (!firstSegment) continue
+
+    const modified = typeof file.modified === 'number' ? file.modified : 0
+
+    if (rest.length) {
+      if (normalizedFilter && !firstSegment.toLowerCase().includes(normalizedFilter)) continue
+
+      const folderPath = folderPrefix ? `${folderPrefix}${firstSegment}` : firstSegment
+      const existing = folderMap.get(folderPath)
+      if (!existing || modified > existing.modified) {
+        folderMap.set(folderPath, {
+          type: 'folder',
+          path: folderPath,
+          name: firstSegment,
+          modified,
+        })
+      }
+      continue
+    }
+
+    const name = getFileName(file)
+    if (normalizedFilter && !name.toLowerCase().includes(normalizedFilter)) continue
+
+    files.push({
+      type: 'file',
+      file,
+      path,
+      name,
+      modified,
+    })
+  }
+
+  return [...folderMap.values(), ...files].sort(compareEntries)
+})
+
+const pageEntries = computed(() => {
   const start = currentPage.value * FILES_PER_REQUEST
-  return sortedFiles.value.slice(start, start + FILES_PER_REQUEST)
+  return browserEntries.value.slice(start, start + FILES_PER_REQUEST)
 })
 
+const pageFolders = computed(() => pageEntries.value.filter((entry): entry is FolderEntry => entry.type === 'folder'))
+const pageFiles = computed(() => pageEntries.value.filter((entry): entry is FileEntry => entry.type === 'file'))
 const canGoUp = computed(() => currentPage.value > 0)
 
 const canGoDown = computed(() => {
   const nextStart = (currentPage.value + 1) * FILES_PER_REQUEST
-  return nextStart < sortedFiles.value.length
+  return nextStart < browserEntries.value.length
 })
+
+const sortButtons = computed<Array<{ mode: SortMode; icon: string; label: string }>>(() => [
+  { mode: 'modified-desc', icon: 'mdi-sort-clock-descending-outline', label: 'Modified newest first' },
+  { mode: 'modified-asc', icon: 'mdi-sort-clock-ascending-outline', label: 'Modified oldest first' },
+  { mode: 'name-asc', icon: 'mdi-sort-alphabetical-ascending', label: 'Name A to Z' },
+  { mode: 'name-desc', icon: 'mdi-sort-alphabetical-descending', label: 'Name Z to A' },
+])
+
+function compareEntries(a: BrowserEntry, b: BrowserEntry): number {
+  if (a.type !== b.type) return a.type === 'folder' ? -1 : 1
+
+  switch (sortMode.value) {
+    case 'modified-asc':
+      return a.modified - b.modified || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    case 'name-asc':
+      return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    case 'name-desc':
+      return b.name.localeCompare(a.name, undefined, { sensitivity: 'base' })
+    case 'modified-desc':
+    default:
+      return b.modified - a.modified || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+  }
+}
 
 function getFileName(file: MoonrakerFile): string {
   const name = file.display || file.filename || file.path || t('print_files.unknown_file')
-  return name.replace(/\.gcode$/i, '')
-}
-
-function formatPrintTime(seconds: number | undefined): string {
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return ''
-
-  let remaining = Math.floor(seconds)
-  const days = Math.floor(remaining / 86400)
-  remaining %= 86400
-  const hours = Math.floor(remaining / 3600)
-  remaining %= 3600
-  const minutes = Math.floor(remaining / 60)
-
-  const parts: string[] = []
-  if (days > 0) parts.push(`${days}d`)
-  if (hours > 0) parts.push(`${hours}h`)
-  if (minutes > 0) parts.push(`${minutes}m`)
-
-  return parts.join('') || '0m'
-}
-
-function formatWeight(weight: number | undefined): string {
-  if (typeof weight !== 'number' || !Number.isFinite(weight)) return ''
-  return `${weight.toFixed(1)}g`
+  const pathParts = name.split('/').filter(Boolean)
+  const leafName = pathParts.length ? pathParts[pathParts.length - 1] : name
+  return leafName.replace(/\.gcode$/i, '')
 }
 
 function getMetadata(file: MoonrakerFile): MoonrakerGcodeMetadata | null {
@@ -143,7 +223,7 @@ function getMetadata(file: MoonrakerFile): MoonrakerGcodeMetadata | null {
 
 function getFilePath(file: MoonrakerFile): string | null {
   const value = file.path || file.filename || file.display
-  return typeof value === 'string' && value.trim() ? value : null
+  return typeof value === 'string' && value.trim() ? value.replace(/^\/+/, '') : null
 }
 
 function getBestThumbnailUrl(file: MoonrakerFile): string | null {
@@ -171,9 +251,35 @@ function openPrintDialog(file: MoonrakerFile) {
   const filePath = getFilePath(file)
 
   selectedFile.value = file
-  selectedFileThumbnails.value = filePath ? pageThumbnails.value[filePath] ?? [] : []
   selectedFileMetadata.value = filePath ? fileMetadata.value[filePath] ?? null : null
   printDialogOpen.value = true
+}
+
+async function openFolder(path: string) {
+  currentFolder.value = path
+  currentPage.value = 0
+  await loadFiles()
+  await loadCurrentPageThumbnails()
+}
+
+async function goBackFolder() {
+  if (!currentFolder.value) return
+
+  const parts = currentFolder.value.split('/').filter(Boolean)
+  parts.pop()
+  currentFolder.value = parts.join('/')
+  currentPage.value = 0
+
+  await loadFiles()
+  await loadCurrentPageThumbnails()
+}
+
+async function goRootFolder() {
+  currentFolder.value = ''
+  currentPage.value = 0
+
+  await loadFiles()
+  await loadCurrentPageThumbnails()
 }
 
 async function loadFiles() {
@@ -217,8 +323,8 @@ async function loadCurrentPageThumbnails() {
     fileMetadata.value = {}
 
     const entries = await Promise.all(
-        pageFiles.value.map(async (file) => {
-          const filePath = getFilePath(file)
+        pageFiles.value.map(async (entry) => {
+          const filePath = entry.path
           if (!filePath) return null
 
           const [thumbnailResult, metadataResult] = await Promise.all([
@@ -260,6 +366,11 @@ watch(currentPage, async () => {
   await loadCurrentPageThumbnails()
 })
 
+watch([currentFolder, sortMode, nameFilter], async () => {
+  currentPage.value = 0
+  await loadCurrentPageThumbnails()
+})
+
 onMounted(async () => {
   currentPage.value = 0
   await loadFiles()
@@ -268,7 +379,75 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="print-file-panel">
+  <div
+      class="print-file-panel"
+      :class="{ 'print-file-panel--subfolder': currentFolder }"
+  >
+    <v-toolbar
+        class="print-file-panel__toolbar px-2"
+        density="compact"
+        rounded
+        flat
+    >
+      <v-btn-toggle
+          v-model="sortMode"
+          mandatory
+          density="comfortable"
+          divided
+      >
+        <v-btn
+            v-for="button in sortButtons"
+            :key="button.mode"
+            :value="button.mode"
+            :icon="button.icon"
+            :aria-label="button.label"
+            :title="button.label"
+            style="min-width: 50px;"
+        />
+      </v-btn-toggle>
+
+      <v-text-field
+          v-model="nameFilter"
+          class="print-file-panel__filter"
+          density="compact"
+          variant="plain"
+          hide-details
+          readonly
+          prepend-inner-icon="mdi-filter-outline"
+          :placeholder="t('print_files.filter')"
+          single-line
+          @click="keyboardOpen = true"
+          @focus="keyboardOpen = true"
+      />
+    </v-toolbar>
+
+    <div v-if="currentFolder" class="print-file-panel__breadcrumbs">
+      <v-btn
+          icon="mdi-arrow-left"
+          density="comfortable"
+          variant="text"
+          @click="goBackFolder"
+      />
+      <v-btn
+          size="small"
+          variant="text"
+          prepend-icon="mdi-home-outline"
+          @click="goRootFolder"
+      >
+
+      </v-btn>
+      <template v-for="crumb in breadcrumbs" :key="crumb.path">
+        <v-icon icon="mdi-chevron-right" size="16" />
+        <v-btn
+            size="small"
+            variant="text"
+            @click="openFolder(crumb.path)"
+        >
+          {{ crumb.name }}
+        </v-btn>
+      </template>
+    </div>
+
     <div class="print-file-panel__nav">
       <v-btn
           v-if="canGoUp"
@@ -291,7 +470,7 @@ onMounted(async () => {
       <v-progress-circular indeterminate />
     </div>
 
-    <div v-else-if="!pageFiles.length" class="print-file-panel__state">
+    <div v-else-if="!pageEntries.length" class="print-file-panel__state">
       <v-alert type="info" variant="tonal">
         {{ t('print_files.none_found') }}
       </v-alert>
@@ -299,60 +478,38 @@ onMounted(async () => {
 
     <div v-else class="print-file-panel__grid">
       <v-card
-          v-for="file in pageFiles"
-          :key="file.path || file.filename"
-          class="print-file-card"
-          :class="{ 'print-file-card--disabled': !printerIsReadyForSelection }"
+          v-for="entry in pageFolders"
+          :key="`folder:${entry.path}`"
+          class="print-folder-card pa-0"
           variant="flat"
-          @click="openPrintDialog(file)"
+          @click="openFolder(entry.path)"
       >
-        <div class="print-file-card__title">
-          {{ getFileName(file) }}
+        <v-icon icon="mdi-folder" style="font-size: 48px;" />
+        <div class="print-folder-card__title">
+          {{ entry.name }}
         </div>
-
-        <div class="print-file-card__thumb-wrap">
-          <img
-              v-if="getBestThumbnailUrl(file)"
-              :src="getBestThumbnailUrl(file)!"
-              :alt="getFileName(file)"
-              class="print-file-card__thumb"
-          >
-
-          <div v-else class="print-file-card__thumb-placeholder">
-            <v-progress-circular
-                v-if="loadingPage"
-                indeterminate
-                size="32"
-            />
-            <v-icon
-                v-else
-                icon="mdi-printer-3d"
-                size="48"
-            />
-          </div>
-        </div>
-
-        <v-card-text class="print-file-card__content">
-          <div class="print-file-card__meta">
-            <span
-                v-if="formatPrintTime(getMetadata(file)?.estimated_time)"
-                class="print-file-card__meta-item"
-            >
-              <v-icon icon="mdi-clock-outline" size="14" />
-              <span>{{ formatPrintTime(getMetadata(file)?.estimated_time) }}</span>
-            </span>
-
-            <span
-                v-if="formatWeight(getMetadata(file)?.filament_weight_total ?? getMetadata(file)?.filament_weight ?? getMetadata(file)?.filament?.weight_total ?? getMetadata(file)?.filament?.weight)"
-                class="print-file-card__meta-item"
-            >
-              <v-icon icon="mdi-scale-balance" size="14" />
-              <span>{{ formatWeight(getMetadata(file)?.filament_weight_total ?? getMetadata(file)?.filament_weight ?? getMetadata(file)?.filament?.weight_total ?? getMetadata(file)?.filament?.weight) }}</span>
-            </span>
-          </div>
-        </v-card-text>
       </v-card>
+
+      <PrintFilePreview
+          v-for="entry in pageFiles"
+          :key="entry.path"
+          :file="entry.file"
+          :title="entry.name"
+          :thumbnail-url="getBestThumbnailUrl(entry.file)"
+          :metadata="getMetadata(entry.file)"
+          :loading="loadingPage"
+          :disabled="!printerIsReadyForSelection"
+          @select="openPrintDialog"
+      />
     </div>
+
+    <KeyboardOverlay
+        v-model="nameFilter"
+        :visible="keyboardOpen"
+        :title="t('print_files.filter_description')"
+        @enter="keyboardOpen = false"
+        @close="keyboardOpen = false"
+    />
 
     <PrintDialog
         v-model="printDialogOpen"
@@ -371,6 +528,25 @@ onMounted(async () => {
   gap: 12px;
   padding: 8px;
   box-sizing: border-box;
+}
+
+.print-file-panel__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.print-file-panel__filter {
+  max-width: 320px;
+  margin-left: auto;
+}
+
+.print-file-panel__breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 36px;
+  overflow-x: auto;
 }
 
 .print-file-panel__nav {
@@ -392,94 +568,55 @@ onMounted(async () => {
 }
 
 .print-file-panel__grid {
+  --print-card-height: 25.5vh;
   flex: 1;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: var(--print-card-height);
   gap: 16px;
   overflow: auto;
 }
 
-.print-file-card {
-  overflow: hidden;
-  background: transparent !important;
-  box-shadow: none !important;
-  position: relative;
+.print-file-panel--subfolder .print-file-panel__grid {
+  --print-card-height: 22vh;
+}
+
+.print-folder-card {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   cursor: pointer;
+  box-shadow: none !important;
+  height: 100%;
+  min-height: 0;
 }
 
-.print-file-card--disabled {
-  cursor: default;
-  pointer-events: auto;
-  opacity: 0.55;
-}
-
-.print-file-card__title,
-.print-file-card__meta {
-  z-index: 2;
-  background: rgba(var(--v-theme-background), 0.8);
-}
-
-.print-file-card__title {
+.print-folder-card__title {
+  max-width: 100%;
   font-weight: 600;
   line-height: 1.2;
+  text-align: center;
   word-break: break-word;
-  padding: 8px 10px;
-  border-radius: 8px 8px 0 0;
-  font-size: 0.8rem;
 }
 
-.print-file-card__thumb-wrap {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  aspect-ratio: 1.3 / 1;
-  background: rgba(var(--v-theme-on-surface), 0.06);
-  display: flex;
+.print-file-panel__filter :deep(.v-field) {
   align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 
-.print-file-card__thumb {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.print-file-card__thumb-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
+.print-file-panel__filter :deep(.v-field__field) {
   align-items: center;
-  justify-content: center;
 }
 
-.print-file-card__content {
-  padding: 0;
-}
-
-.print-file-card__meta {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  font-size: 0.9rem;
-  opacity: 0.75;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.print-file-panel__filter :deep(.v-field__input) {
+  min-height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
   align-items: center;
-  padding: 8px 10px;
-  border-radius: 0 0 8px 8px;
 }
 
-.print-file-card__meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.print-file-panel__filter :deep(.v-field__prepend-inner) {
+  transform: translateY(-4px);
 }
 </style>

@@ -64,6 +64,8 @@
     }
   },
   "print_files": {
+    "filter": "Filter",
+    "filter_description": "Filter print files by name",
     "none_found": "No print files found",
     "unknown_file": "Unknown file"
   },
